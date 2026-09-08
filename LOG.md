@@ -233,6 +233,13 @@ built its `<option>` list via unescaped `innerHTML` interpolation of
 fixed for the table body (`renderTable()`), but this call site was missed.
 Same fix: route it through the existing `escapeHtml()` helper.
 
+**Known data limitation, not a bug**: the World Bank's population dataset
+excludes Taiwan entirely (it doesn't publish indicators for Taiwan as a
+separate country). Agencies there get `population = NULL` and score purely
+on `quality_score`. Confirmed via the final sanity check: 12/2,939 (0.4%) of
+uncovered agencies hit this — small enough to leave as-is rather than adding
+a special case for one territory.
+
 **Not fixed, deliberately**: enrichment's per-agency feed downloads and
 population lookups run strictly sequentially (`httpx` synchronous calls in a
 loop). They're independent per agency and could be parallelized (e.g.
