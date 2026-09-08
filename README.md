@@ -38,6 +38,26 @@ docker-compose run --rm api python run.py
 
 Re-run `run.py` any time to refresh the data — every step is idempotent (re-running upserts/replaces rather than duplicating rows).
 
+## Running tests
+
+```
+python3 -m pip install --user pytest httpx
+python3 -m pytest tests/
+```
+
+Most of `tests/` are unit tests that don't need anything running. `tests/test_api_integration.py` is different — it's a black-box smoke test suite that makes real HTTP requests against a live API instance, so `docker-compose up` (or an equivalent deployment) needs to be running first:
+
+```
+docker-compose up --build   # in another terminal
+python3 -m pytest tests/test_api_integration.py -v
+```
+
+By default it targets `http://localhost:8000`. To run it against a deployed instance instead (e.g. Railway), point it at that URL with `API_BASE_URL`:
+
+```
+API_BASE_URL=https://your-app.up.railway.app python3 -m pytest tests/test_api_integration.py -v
+```
+
 ## Live URL
 
 YOUR_RAILWAY_URL

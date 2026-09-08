@@ -430,7 +430,7 @@ README.md / LOG.md). -->
       const countries = Array.from(new Set(allAgencies.map((a) => a.country).filter(Boolean))).sort();
       countryFilter.innerHTML =
         '<option value="">All countries</option>' +
-        countries.map((c) => `<option value="${c}">${c}</option>`).join("");
+        countries.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
     }
 
     function renderStats(stats) {

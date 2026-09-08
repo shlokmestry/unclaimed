@@ -226,6 +226,13 @@ progress. Fixed:
 - **`README.md`**: added the "Manual setup" section it and `.env.example`
   were already both referring readers to, which didn't actually exist.
 
+**Follow-up finding from a dedicated security review pass, fixed**: the
+country-filter `<select>` in `frontend/index.html`'s `populateCountryFilter()`
+built its `<option>` list via unescaped `innerHTML` interpolation of
+`a.country` — the same class of stored-XSS the first review pass had already
+fixed for the table body (`renderTable()`), but this call site was missed.
+Same fix: route it through the existing `escapeHtml()` helper.
+
 **Not fixed, deliberately**: enrichment's per-agency feed downloads and
 population lookups run strictly sequentially (`httpx` synchronous calls in a
 loop). They're independent per agency and could be parallelized (e.g.
