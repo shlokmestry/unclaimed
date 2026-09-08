@@ -293,3 +293,51 @@ re-run often.
   `TRANSIT_REGIONS_URL`, `REST_COUNTRIES_BASE_URL`,
   `MATCH_CONFIDENCE_THRESHOLD`) — left commented as optional overrides so
   they're discoverable without forcing you to set them.
+
+## Deployment: switched from Railway to Vercel + Supabase
+
+`DEPLOY.md`/`railway.json` (above) were fully written and independently
+verified, but Railway's free trial had already been used on this account and
+continuing there meant paying. Rebuilt the deploy on entirely free
+infrastructure instead:
+
+- **Database**: Supabase (Postgres) instead of Railway's managed Postgres —
+  free forever at this scale, no time limit (unlike e.g. Render's free
+  Postgres, which is deleted after 90 days). Used the **Transaction pooler**
+  connection (port 6543, IPv4) rather than the direct connection (port 5432)
+  — Supabase's direct connections are IPv6-only for new projects, which this
+  environment couldn't route to at all (`Network is unreachable`).
+- **API**: Vercel, as a Python serverless function, instead of an
+  always-on Docker container. This is a materially different runtime model
+  than the Dockerfile-based deploy the whole rest of this project uses
+  locally: no persistent process, each request is a fresh invocation. Added:
+  - `vercel.json` — rewrites every path to `/api/main` (the FastAPI app),
+    since Vercel's Python runtime otherwise only serves it at `/api/main`.
+  - `.python-version` (`3.12`) — pins a modern enough interpreter for this
+    codebase's `X | None` union-type syntax; Vercel's default wasn't
+    guaranteed to be 3.10+.
+  - `db/async_session.py`: `connect_args={"statement_cache_size": 0}` on the
+    asyncpg engine — required against a PgBouncer/Supavisor transaction
+    pooler (Supabase's, but the same fix applies to Neon/Railway poolers
+    too), since a prepared statement can otherwise get reused on a different
+    physical connection than the one that created it, causing intermittent
+    "prepared statement does not exist" errors under real traffic.
+  - The pipeline (`run.py`) still cannot and does not run on Vercel —
+    serverless function time limits are far shorter than the ~1-1.5 hour
+    enrichment run takes. It keeps running locally/in Docker as before,
+    just pointed at Supabase's `DATABASE_URL` instead of local Postgres.
+    Already-validated data was copied over directly (`pg_dump`/`psql`)
+    rather than re-run from scratch, since the pipeline had already been
+    verified end-to-end against local Postgres.
+- **Frontend**: Vercel static hosting (`frontend/index.html`, `rootDirectory:
+  frontend`) — no changes needed, it was already a plain static file.
+- Both Vercel projects were created manually via the dashboard rather than
+  through the available Vercel API/MCP connector — the connector's token
+  consistently got `403 forbidden` on project creation specifically (a
+  team-role/permission restriction on that connection, unrelated to the
+  GitHub App repo-access grant, which was also required separately). Once a
+  project exists, configuration/redeploys work fine through the connector.
+- Vercel deploys from the **`main`** branch by default. All of this project's
+  work happened on `dev` and `main` was still at the Step-1 scaffold commit,
+  so the first deploy attempt built nothing (`no "functions", "static", or
+  "services" directory`). Fixed by merging `dev` into `main`.
