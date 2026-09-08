@@ -82,38 +82,41 @@ def score_feed(feed_bytes: bytes) -> tuple[float, list[str]]:
         logger.error("Feed is not a valid zip: %s", exc)
         return 0.0, list(REQUIRED_FILES)
 
-    names = zf.namelist()
-    members = {}
-    for filename in REQUIRED_FILES:
-        member = _find_member(names, filename)
-        if member:
-            members[filename] = member
-            score += POINTS_PER_REQUIRED_FILE
-        else:
-            missing.append(filename)
+    try:
+        names = zf.namelist()
+        members = {}
+        for filename in REQUIRED_FILES:
+            member = _find_member(names, filename)
+            if member:
+                members[filename] = member
+                score += POINTS_PER_REQUIRED_FILE
+            else:
+                missing.append(filename)
 
-    if "stops.txt" in members:
-        try:
-            if _count_rows(zf, members["stops.txt"]) > 10:
-                score += 10
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Could not count stops.txt rows: %s", exc)
+        if "stops.txt" in members:
+            try:
+                if _count_rows(zf, members["stops.txt"]) > 10:
+                    score += 10
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not count stops.txt rows: %s", exc)
 
-    if "routes.txt" in members:
-        try:
-            if _count_rows(zf, members["routes.txt"]) > 3:
-                score += 10
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Could not count routes.txt rows: %s", exc)
+        if "routes.txt" in members:
+            try:
+                if _count_rows(zf, members["routes.txt"]) > 3:
+                    score += 10
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not count routes.txt rows: %s", exc)
 
-    if "calendar.txt" in members:
-        try:
-            if _calendar_has_future_dates(zf, members["calendar.txt"]):
-                score += 5
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Could not evaluate calendar.txt future dates: %s", exc)
+        if "calendar.txt" in members:
+            try:
+                if _calendar_has_future_dates(zf, members["calendar.txt"]):
+                    score += 5
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not evaluate calendar.txt future dates: %s", exc)
 
-    return score, missing
+        return score, missing
+    finally:
+        zf.close()
 
 
 def fetch_feed_quality(feed_url: str | None) -> tuple[float, list[str]]:
@@ -201,6 +204,14 @@ def normalize_populations(populations: list[int | None]) -> dict[int | None, flo
 
 def run_enrichment() -> int:
     with SessionLocal() as session:
+        unmatched = session.query(MobilityAgency).filter(MobilityAgency.is_covered.is_(None)).count()
+        if unmatched:
+            logger.warning(
+                "%d mobility_agencies rows have is_covered = NULL (matching.py hasn't run yet "
+                "for them) and will be skipped by this filter, not counted as uncovered",
+                unmatched,
+            )
+
         uncovered = (
             session.query(MobilityAgency).filter(MobilityAgency.is_covered.is_(False)).all()
         )

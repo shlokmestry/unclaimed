@@ -344,6 +344,20 @@ README.md / LOG.md). -->
       return new Intl.NumberFormat("en-US").format(n);
     }
 
+    // Agency fields (name, country, municipality, feed_url) come from GTFS
+    // feed metadata pulled from external, unsanitized sources — escape before
+    // interpolating into innerHTML so a crafted feed name/URL can't inject
+    // markup or break out of an attribute.
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function renderStateRow(message, isError) {
       tableBody.innerHTML = `<tr><td colspan="7">
         <div class="state-row ${isError ? "error" : ""}">
@@ -383,15 +397,15 @@ README.md / LOG.md). -->
         .map(
           (a) => `
         <tr>
-          <td>${a.name ?? "—"}</td>
-          <td>${a.country ?? "—"}</td>
-          <td>${a.municipality ?? "—"}</td>
+          <td>${escapeHtml(a.name) || "—"}</td>
+          <td>${escapeHtml(a.country) || "—"}</td>
+          <td>${escapeHtml(a.municipality) || "—"}</td>
           <td class="num">${numberFormat(a.population)}</td>
           <td class="num">${a.quality_score ?? "—"}</td>
           <td class="num">${a.opportunity_score ?? "—"}</td>
           <td>${
             a.feed_url
-              ? `<button class="feed-btn" onclick="window.open('${a.feed_url}', '_blank', 'noopener')">View Feed</button>`
+              ? `<button class="feed-btn" data-feed-url="${escapeHtml(a.feed_url)}">View Feed</button>`
               : "—"
           }</td>
         </tr>`
@@ -467,6 +481,17 @@ README.md / LOG.md). -->
     qualitySlider.addEventListener("input", () => {
       qualitySliderValue.textContent = qualitySlider.value;
       renderTable();
+    });
+
+    // Delegated click handler for "View Feed" buttons — reads the URL from
+    // a data attribute (escaped at render time) rather than an inline
+    // onclick, which would otherwise need the raw URL string-interpolated
+    // into JS source.
+    tableBody.addEventListener("click", (e) => {
+      const btn = e.target.closest(".feed-btn");
+      if (btn && btn.dataset.feedUrl) {
+        window.open(btn.dataset.feedUrl, "_blank", "noopener");
+      }
     });
 
     loadData();

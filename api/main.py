@@ -20,7 +20,11 @@ app = FastAPI(title="Unclaimed API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # This API is fully public and read-only with no cookies/auth, so there's
+    # no session to carry — allow_credentials=True combined with a wildcard
+    # origin is an invalid combination per the CORS spec anyway (browsers
+    # reject it for credentialed requests).
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -8,11 +8,21 @@ Unclaimed — finds transit agencies with public GTFS feeds not yet covered by T
 - Scores each uncovered agency's feed quality (0-100, based on which required GTFS files are present, row counts, and whether service dates extend into the future) and pulls its country's population as a market-size proxy.
 - Ranks every uncovered agency by an opportunity score — 60% normalized population, 40% feed quality — so the dashboard surfaces the biggest, best-documented gaps first.
 
+## Manual setup
+
+The pipeline needs one credential you have to obtain yourself (everything
+else runs with no manual steps):
+
+- **Mobility Database token** — sign up free at https://mobilitydatabase.org,
+  copy your refresh token from your account settings, and set it as
+  `MOBILITY_API_TOKEN` in `.env`. `ingestion/mobility_db.py` exchanges it for
+  a short-lived access token at request time — see `LOG.md`.
+
 ## Run locally
 
 ```
 cp .env.example .env
-# fill in MOBILITY_API_TOKEN in .env — see "Manual steps" below
+# fill in MOBILITY_API_TOKEN in .env — see "Manual setup" above
 docker-compose up --build
 ```
 

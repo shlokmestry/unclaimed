@@ -152,6 +152,89 @@ Decisions made during the build that weren't explicitly specified in the brief.
   logged, `population=None`) until `follow_redirects=True` was added to the
   request in `fetch_population()`.
 
+## Step 3 — corrected after inspecting the live page (post-first-run)
+
+The first live pipeline run completed with **0 covered agencies out of 4,548**
+— clearly wrong (the brief's whole premise is that most agencies *are*
+covered somewhere). Root cause was in the original (pre-network-access)
+`_parse_headings_and_lists` strategy: the real page nests **country (`<h2>`)
+→ region (`<h3>`, optional) → cities (`<ul><li>`)**, but that strategy
+treated every `<h2>`/`<h3>` heading as a country indiscriminately. For the US
+section, that meant state headings like `"Alabama🦋"` got stored as the
+*country* — `country_name_to_code()` correctly failed to resolve
+`"Alabama🦋"` to anything, `country_code` came back null for 916/918
+`transit_covered` rows, and Step 4's country-code filter then had essentially
+no real candidates to match against for any country.
+
+Fixed by fetching and inspecting the real page (network access to the actual
+site is available in this environment, unlike the earlier assumption — see
+the chat) and rewriting `transit_cities.py`'s primary strategy
+(`_parse_region_hierarchy`) around the confirmed structure:
+
+- `<h2>` = country, `<h3>` = region (always, regardless of the decorative
+  emoji each carries) — walked in document order as a state machine rather
+  than via sibling/parent lookups, since regions sit in a `<ul>` immediately
+  after their `<h3>` but countries with no region breakdown (UK, Australia,
+  most of Europe) have their `<ul>` further down inside a wrapping `<div>`,
+  not as the `<h2>`'s next sibling.
+- Every country heading carries a **flag emoji**, which is just two Unicode
+  regional-indicator characters encoding the ISO alpha-2 code — decoded
+  directly (`_decode_flag`) instead of guessing the code from display text.
+  This is more reliable than the `pycountry`-based `country_name_to_code()`
+  fallback (still used for the hardcoded FALLBACK_CITIES list, which has no
+  emoji to decode) and sidesteps name-mismatch issues entirely for the
+  scraped path.
+- Verified against a real fetch of the live page: 1,228 cities across 37
+  countries, all with a correctly decoded country code, before trusting the
+  rewrite enough to re-run the pipeline.
+- The old `_parse_headings_and_lists` strategy was removed outright (proven
+  wrong for this real site, and keeping it as a "fallback" risked silently
+  reintroducing the exact same bug) rather than kept as a lower-priority
+  strategy.
+
+## Code review pass (before deployment)
+
+Ran a full review of Steps 2-10 while the corrected enrichment run was in
+progress. Fixed:
+
+- **XSS in `frontend/index.html`**: agency `name`/`country`/`municipality`/
+  `feed_url` come from external GTFS feed metadata (not sanitized anywhere
+  upstream) and were interpolated directly into `innerHTML`, with `feed_url`
+  also inlined into an `onclick` attribute. Added an `escapeHtml()` helper for
+  the text fields and switched the "View Feed" button to a `data-feed-url`
+  attribute read by a delegated click handler instead of inline `onclick`.
+- **CORS**: `allow_credentials=True` combined with `allow_origins=["*"]` is an
+  invalid combination for credentialed requests and was pointless anyway (the
+  API has no cookies/auth) — set to `False`.
+- **`db/config.py`**: `ASYNC_DATABASE_URL` derivation only matched
+  `postgresql://` exactly; generalized to a regex that also handles
+  `postgresql+<anydriver>://` so a non-default sync driver in `DATABASE_URL`
+  doesn't silently produce a broken async URL.
+- **`ingestion/enrichment.py`**: `score_feed()`'s `ZipFile` was never closed;
+  wrapped in `try`/`finally`. Also added a warning log in `run_enrichment()`
+  if any `mobility_agencies` rows still have `is_covered = NULL` (matching.py
+  hasn't run for them yet) — they're silently excluded by the `is_covered =
+  False` filter, which is correct once the pipeline has run in order, but is
+  worth surfacing if enrichment is ever run standalone out of order.
+- **`ingestion/transit_cities.py`**: removed accidental string-literal quotes
+  around the `CityEntry` type alias's `str | None` members (a no-op at
+  runtime, but meant static type-checking silently saw a string constant
+  instead of a real type). Also hardened `_parse_region_hierarchy` to ignore
+  an `<a>` nested inside an `<h2>`/`<h3>` — not currently the case on the live
+  page (verified against the real fetch), but would otherwise misread a
+  linked heading as one of its own cities if the markup ever changes that way.
+- **`README.md`**: added the "Manual setup" section it and `.env.example`
+  were already both referring readers to, which didn't actually exist.
+
+**Not fixed, deliberately**: enrichment's per-agency feed downloads and
+population lookups run strictly sequentially (`httpx` synchronous calls in a
+loop). They're independent per agency and could be parallelized (e.g.
+`httpx.AsyncClient` + a semaphore) for a meaningful speedup — with thousands
+of uncovered agencies this is the pipeline's biggest time cost. Left as-is
+for this build rather than rewriting and re-verifying a multi-thousand-feed
+run right before deployment; worth doing as a follow-up if the pipeline is
+re-run often.
+
 ## Step 6 — API
 
 - `sort_by` is validated against a whitelist of real columns

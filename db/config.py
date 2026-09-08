@@ -5,6 +5,7 @@
 # environment regardless of how it was invoked.
 
 import os
+import re
 
 from dotenv import load_dotenv
 
@@ -16,17 +17,12 @@ DATABASE_URL = os.environ.get(
 
 # Async driver variant of DATABASE_URL, used by the FastAPI app. SQLAlchemy's
 # async engine needs the `+asyncpg` dialect; the rest of the codebase (Docker
-# env vars, docker-compose, ingestion scripts) only ever deals with the plain
-# `postgresql://` form, so we derive the async URL here instead of asking for
-# a second env var.
-if DATABASE_URL.startswith("postgresql+asyncpg://"):
-    ASYNC_DATABASE_URL = DATABASE_URL
-elif DATABASE_URL.startswith("postgresql://"):
-    ASYNC_DATABASE_URL = DATABASE_URL.replace(
-        "postgresql://", "postgresql+asyncpg://", 1
-    )
-else:
-    ASYNC_DATABASE_URL = DATABASE_URL
+# env vars, docker-compose, ingestion scripts) only ever deals with a plain
+# sync `postgresql://` (optionally `+<driver>`) URL, so we derive the async
+# one here instead of asking for a second env var. The regex normalizes any
+# `postgresql` or `postgresql+<driver>` scheme (e.g. `+psycopg2`) to
+# `postgresql+asyncpg`, not just the exact `postgresql://` case.
+ASYNC_DATABASE_URL = re.sub(r"^postgresql(\+\w+)?://", "postgresql+asyncpg://", DATABASE_URL, count=1)
 
 MOBILITY_API_TOKEN = os.environ.get("MOBILITY_API_TOKEN", "")
 
