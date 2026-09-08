@@ -22,6 +22,6 @@ Right now it's showing 2,939 uncovered agencies, with United States and India co
 
 Some caveats worth being upfront about: coverage matching is fuzzy-string-based (name + country code), so there will be some false positives/negatives at the margins, and population is a market-size proxy, not a demand estimate. I'd treat it as a prioritization starting point, not ground truth.
 
-Dashboard's here if you want to poke around: {DASHBOARD_URL}. Happy to share the raw data or the matching logic if useful.
+Dashboard's here if you want to poke around: https://unclaimed-five.vercel.app. Happy to share the raw data or the matching logic if useful.
 
 {YOUR_NAME}

@@ -60,8 +60,8 @@ API_BASE_URL=https://your-app.up.railway.app python3 -m pytest tests/test_api_in
 
 ## Live URL
 
+- Dashboard: https://unclaimed-five.vercel.app
 - API: https://unclaimed-api.vercel.app
-- Dashboard: (add once `unclaimed-dashboard` is deployed on Vercel)
 
 Deployed on Vercel (API as a Python serverless function, dashboard as a static site) with a free Supabase Postgres database — see `DEPLOY.md` for the original Railway-based plan and `LOG.md` for why the deploy target changed.
 
