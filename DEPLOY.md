@@ -4,10 +4,11 @@ This guide covers deploying the `api` service (FastAPI, built from `api/Dockerfi
 managed Postgres database to [Railway](https://railway.app), and running the one-off
 `run.py` ingestion pipeline against the deployed database.
 
-It was written by reading Railway's own docs (`docs.railway.com`) and CLI reference pages
-as of September 2026. Railway's CLI/dashboard change fairly often — anywhere this guide
-says "verify with `--help`" or flags something as uncertain, treat that as a live checkpoint,
-not a formality.
+It was written and then re-verified by reading Railway's own docs (`docs.railway.com`), CLI
+reference pages, and the live `railway.schema.json` schema, as of September 2026 (see "Sources
+consulted" at the bottom). Railway's CLI/dashboard/deprecation status change fairly often —
+anywhere this guide flags something as unconfirmed or tells you to double-check the dashboard,
+treat that as a live checkpoint, not a formality.
 
 ## 0. What Railway needs to know about this repo
 
@@ -54,7 +55,49 @@ Dockerfile needs, so:
 
 - No `nixpacks.toml` is needed — Nixpacks/Railpack is Railway's buildpack-style builder for
   repos *without* a Dockerfile; since this repo already has one and we've pointed Railway at
-  it explicitly, Railpack is never invoked.
+  it explicitly, Railpack is never invoked (assuming Railway actually reads `railway.json` —
+  see the warning immediately below).
+
+### Important — re-verify this before trusting `railway.json` alone
+
+Railway's own **[Infrastructure as Code](https://docs.railway.com/infrastructure-as-code)**
+docs (re-checked September 2026) state that **Config as Code (`railway.json`/`railway.toml`)
+is deprecated**, and — critically — **"New services cannot opt into Config as Code."**
+Existing files are only still read "for existing (legacy) services," and even that support
+"stops being read on 2026-12-01 (hard cutoff)." The
+[Config as Code reference page](https://docs.railway.com/reference/config-as-code) carries the
+same deprecation banner. Since this guide has you create a brand-new project and a brand-new
+`api` service (`railway init`, `railway add --repo`), the `api` service is a **new** service in
+Railway's terms — meaning `railway.json`'s `build`/`deploy` settings may simply be **ignored**,
+and Railway could silently fall back to Railpack instead of the Dockerfile (a much worse
+failure mode than an outright error, since a Python repo with a `requirements.txt` at the root
+may look buildable to Railpack even though it has no idea about `api.main:app`).
+
+`railway.json` is left in this repo because it's harmless and costs nothing, but **do not rely
+on it alone**. Immediately after step 4 creates the `api` service, do one of the following:
+
+- **Preferred, non-deprecated fallback:** set the Dockerfile path via the documented
+  `RAILWAY_DOCKERFILE_PATH` service variable, which works independently of Config as Code's
+  status ([source](https://docs.railway.com/builds/dockerfiles#custom-dockerfile-path)):
+
+  ```bash
+  railway variable set 'RAILWAY_DOCKERFILE_PATH=/api/Dockerfile' --service api
+  ```
+
+- Or check whether `railway.json` was actually honored: open the deployment's details page in
+  the dashboard and look for the small file icon next to the Builder/Dockerfile Path settings
+  (Railway shows this next to any setting sourced from a config file —
+  [source](https://docs.railway.com/reference/config-as-code#config-source-location)). If it's
+  missing, set **Settings → Build → Builder: Dockerfile** (with the custom path, or the
+  `RAILWAY_DOCKERFILE_PATH` variable above) manually.
+
+`healthcheckPath`/`restartPolicyType` from `railway.json` are subject to the same caveat, but
+they're low-stakes either way: `ON_FAILURE` (with up to 10 retries) is already Railway's
+default restart policy, and a missing healthcheck just means Railway skips the zero-downtime
+health-check-before-cutover behavior rather than failing the deploy
+([source](https://docs.railway.com/deployments/restart-policy),
+[source](https://docs.railway.com/deployments/healthchecks)). Set them manually in the
+service's Settings tab if you want them and they didn't take effect from the file.
 
 ## 1. Prerequisites
 
@@ -96,8 +139,9 @@ railway add --database postgres
 
 This adds a managed Postgres service to the project and deploys it immediately. It
 automatically populates that service's own variables: `DATABASE_URL`, `PGHOST`, `PGPORT`,
-`PGUSER`, `PGPASSWORD`, `PGDATABASE` (and, only if you later enable Public Networking on
-it, `DATABASE_PUBLIC_URL`). You do not need to set any Postgres credentials yourself.
+`PGUSER`, `PGPASSWORD`, `PGDATABASE` (and, only if you later enable **Public Access** on
+it — Settings → Networking — `DATABASE_PUBLIC_URL`). You do not need to set any Postgres
+credentials yourself.
 
 By default the Railway CLI names this service `Postgres` — confirm the exact name with:
 
@@ -116,10 +160,12 @@ railway add --repo <your-github-username>/<your-repo-name>
 
 This creates a new service in the project sourced from that GitHub repo (the first time you
 do this, Railway may prompt you to authorize its GitHub App for the repo/org if it isn't
-already connected — that step happens in the browser). Because `railway.json` is at the
-repo root, Railway will build this service with the Dockerfile builder using
-`api/Dockerfile`, per the config in step 0 — you shouldn't need to touch build settings in
-the dashboard at all.
+already connected — that step happens in the browser). `railway.json` at the repo root
+*may* make Railway build this service with the Dockerfile builder using `api/Dockerfile`
+automatically — **but don't assume that** and skip straight to step 5. Because this is a
+newly created service, go do the check-and-fallback in the "Important" box under step 0
+right now (either set `RAILWAY_DOCKERFILE_PATH`, or confirm the config-file icon is present
+on the deployment details page) before moving on.
 
 Confirm the service name Railway assigned (usually the repo name) with `railway status`;
 this guide calls it `api` below — substitute your actual service name.
@@ -140,11 +186,12 @@ from the defaults baked into `db/config.py` (`MOBILITY_API_BASE_URL`,
 `TRANSIT_REGIONS_URL`, `WORLD_BANK_BASE_URL`, `MATCH_CONFIDENCE_THRESHOLD`). `API_PORT` is
 also not needed — see the port gotcha below.
 
-> **CLI syntax note (uncertain / verify locally):** Railway's docs pages disagree on
-> whether the current subcommand is `railway variable set KEY=value` or
-> `railway variables --set "KEY=value"` — the CLI has renamed this a few times across
-> versions. Run `railway variable --help` and `railway variables --help` and use whichever
-> your installed CLI actually reports before trusting the exact command above verbatim.
+> **CLI syntax (confirmed):** `railway variable set KEY=value [--service NAME]` is the current
+> subcommand — `railway variable` also accepts the aliases `variables`/`vars`/`var`. The older
+> `railway variable --set "KEY=value"` flag form still works but is explicitly documented as
+> deprecated. ([source](https://docs.railway.com/cli/variable)) If you'd rather not put a
+> secret on the command line / in shell history, pipe it in instead:
+> `echo "$MOBILITY_API_TOKEN" | railway variable set MOBILITY_API_TOKEN --service api --stdin`.
 
 Railway does **not** read your local `.env` or `.env.example` files automatically for either
 build or deploy — every variable the app needs has to be set explicitly via the dashboard or
@@ -168,16 +215,28 @@ Railway normally injects a `PORT` environment variable and expects your process 
 `0.0.0.0:$PORT`. This repo's `api/Dockerfile` does not do that — its `CMD` is the exec-form
 `["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]`, which is a fixed port
 and (being exec-form, not shell-form) would not expand `$PORT` even if the variable were
-referenced. Per Railway's docs, when a domain is first generated for a service, Railway
-auto-detects the single port the container is actually listening on and uses that as the
-"target port" — so this should work out of the box here, since 8000 is the only port the
-container opens. If domain generation in step 8 doesn't route traffic correctly:
+referenced. Railway's dashboard shows a "Generate Domain" prompt once it detects a service is
+listening correctly, which suggests some auto-detection of the listening port happens — but
+this repo's fixed single port (8000) should make that detection unambiguous either way. To be
+safe, don't rely on auto-detection; set the target port explicitly when you generate the
+domain in step 8, which is a documented, confirmed CLI flag
+([source](https://docs.railway.com/cli/domain)):
 
-- Check the service's Settings → Networking for a "Target Port" field and set it to `8000`
-  explicitly, or
-- Set a `PORT=8000` variable on the service as a hint (`railway variable set PORT=8000
-  --service api`) — the app itself ignores it, but Railway's own routing layer may use it as
-  a fallback when it can't detect a listening port automatically.
+```bash
+railway domain --service api --port 8000
+```
+
+(If a domain already exists and traffic isn't routing, `railway domain update <domain>
+--service api --port 8000` changes the target port on an existing domain instead.)
+
+Separately, Railway's own healthcheck mechanism (not domain routing) also uses the injected
+`PORT` variable to know which port to probe; if your app doesn't listen on `PORT` (as here),
+Railway's docs say to set a `PORT` variable yourself so healthchecks target the right port
+([source](https://docs.railway.com/deployments/healthchecks#configure-the-healthcheck-port)):
+
+```bash
+railway variable set PORT=8000 --service api
+```
 
 This task intentionally does not modify `api/Dockerfile`, so this is flagged as a
 verify-after-first-deploy item rather than "fixed" here.
@@ -206,13 +265,13 @@ railway ssh --service api -- python run.py
 (Omit `-- python run.py` to drop into an interactive shell in the container instead, if you
 want to poke around first.) Run this only after step 6's deploy has succeeded at least once.
 
-**Option B — enable Public Networking on the Postgres service and run locally.** In the
-Postgres service's Settings → Networking, enable Public Networking (this creates a TCP
+**Option B — enable Public Access on the Postgres service and run locally.** In the
+Postgres service's Settings → Networking, enable **Public Access** (this creates a TCP
 proxy and a `DATABASE_PUBLIC_URL` variable, and will incur some egress cost). Then, from
 your machine, with a Python environment that has `requirements.txt` installed:
 
 ```bash
-DATABASE_URL="$(railway variable get DATABASE_PUBLIC_URL --service Postgres)" python run.py
+DATABASE_URL="$(railway run --service Postgres printenv DATABASE_PUBLIC_URL)" python run.py
 ```
 
 (Or just `railway run` after temporarily pointing the `api` service's `DATABASE_URL` at
@@ -227,13 +286,13 @@ fresh data.
 ## 8. Get the public URL
 
 ```bash
-railway domain --service api
+railway domain --service api --port 8000
 ```
 
 Running this with no existing domain generates a free `*.up.railway.app` Railway domain for
-the service and prints it. Run it again later (or check the dashboard) to see the domain
-without creating a new one. Update the "Live URL" line in `README.md` with whatever it
-prints.
+the service and prints it, explicitly targeting port 8000 per the gotcha in step 6 above. Run
+`railway domain list --service api` later (or check the dashboard) to see existing domains
+without creating a new one. Update the "Live URL" line in `README.md` with whatever it prints.
 
 Verify the deploy:
 
@@ -248,23 +307,55 @@ railway login
 railway init
 railway add --database postgres
 railway add --repo <you>/<repo>
+railway variable set 'RAILWAY_DOCKERFILE_PATH=/api/Dockerfile' --service api   # see step 0 warning
 railway variable set 'DATABASE_URL=${{Postgres.DATABASE_URL}}' --service api
 railway variable set 'MOBILITY_API_TOKEN=<token>' --service api
+railway variable set PORT=8000 --service api                                  # for healthchecks
 railway up --service api
 railway ssh --service api -- python run.py
-railway domain --service api
+railway domain --service api --port 8000
 ```
 
 ## Sources consulted
 
-- https://docs.railway.com/builds/dockerfiles
-- https://docs.railway.com/reference/config-as-code
-- https://docs.railway.com/cli
-- https://docs.railway.com/cli/ssh
-- https://docs.railway.com/cli/add
-- https://docs.railway.com/cli/variable
-- https://docs.railway.com/databases/postgresql
-- https://docs.railway.com/networking/private-networking/how-it-works
-- https://docs.railway.com/guides/fastapi
-- Railway Central Station / Help Station community threads on `railway run` vs private
-  networking, and on target-port detection for public domains.
+This guide was re-verified against Railway's live documentation on 2026-09-08 (fetched
+directly via `curl`, and the schema via `WebFetch`, rather than trusted from training data —
+Railway's CLI/dashboard/deprecation status change often enough that this is worth repeating
+before every real deploy):
+
+- https://railway.com/railway.schema.json (redirects to
+  https://backboard.railway.app/railway.schema.json) — the actual JSON Schema; used to confirm
+  every field name/type/enum in `railway.json` directly, not just from prose docs.
+- https://docs.railway.com/reference/config-as-code — confirms field names/values, and carries
+  the Config as Code deprecation banner.
+- https://docs.railway.com/infrastructure-as-code — confirms "New services cannot opt into
+  Config as Code" and the 2026-12-01 hard cutoff for existing/legacy services.
+- https://docs.railway.com/builds/dockerfiles — `RAILWAY_DOCKERFILE_PATH` service variable as
+  the non-deprecated way to point at a custom Dockerfile path.
+- https://docs.railway.com/deployments/monorepo and
+  https://docs.railway.com/builds/build-configuration — confirm Root Directory defaults to `/`
+  and, when set, changes what "all build and deploy commands operate within," i.e. the build
+  context — the basis for the Root Directory warning in step 0.
+- https://docs.railway.com/guides/cli, https://docs.railway.com/cli/add,
+  https://docs.railway.com/cli/variable, https://docs.railway.com/cli/ssh,
+  https://docs.railway.com/cli/domain, https://docs.railway.com/cli/run — current CLI command
+  and flag syntax for `add`, `variable set`, `ssh`, `domain`, and `run`.
+- https://docs.railway.com/reference/variables — confirms the `${{NAMESPACE.VAR}}` service
+  variable reference syntax.
+- https://docs.railway.com/databases/postgresql — confirms `PGHOST`/`PGPORT`/`PGUSER`/
+  `PGPASSWORD`/`PGDATABASE`/`DATABASE_URL`/`DATABASE_PUBLIC_URL` variable names and that the
+  toggle is called "Public Access," not "Public Networking."
+- https://docs.railway.com/networking/private-networking (and
+  .../private-networking/how-it-works) — confirms the `SERVICE_NAME.railway.internal` private
+  DNS naming behind the `railway run`-executes-locally gotcha in step 7.
+- https://docs.railway.com/networking/domains/working-with-domains — Railway-provided domain
+  generation flow and target-port behavior.
+- https://docs.railway.com/deployments/healthchecks and
+  https://docs.railway.com/deployments/restart-policy — healthcheck `PORT` behavior and
+  confirmation that `ON_FAILURE` is already Railway's default restart policy.
+- https://docs.railway.com/guides/fastapi — consulted for comparison, but flagged as
+  **not fully up to date**: as of this check it still describes `railway.json` as the
+  recommended way to configure a fresh FastAPI deploy, which is inconsistent with the
+  Infrastructure as Code page's "new services cannot opt into Config as Code" statement. The
+  dedicated reference pages (config-as-code, infrastructure-as-code) were treated as
+  authoritative over this tutorial page.
