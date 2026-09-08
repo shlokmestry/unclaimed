@@ -34,8 +34,14 @@ TRANSIT_REGIONS_URL = os.environ.get(
     "TRANSIT_REGIONS_URL", "https://transitapp.com/region"
 )
 
-REST_COUNTRIES_BASE_URL = os.environ.get(
-    "REST_COUNTRIES_BASE_URL", "https://restcountries.com/v3.1"
+# Population data provider for Step 5's market-size proxy. Originally REST
+# Countries (per the brief), but its free v3.1 API was fully retired mid-build
+# (returns HTTP 200 with a "deprecated, get a key" error body instead of
+# failing outright — silently produced zero population data for every agency
+# until this was caught in the live run). Swapped to the World Bank's open
+# data API: also free, no key required, and still live. See LOG.md.
+WORLD_BANK_BASE_URL = os.environ.get(
+    "WORLD_BANK_BASE_URL", "https://api.worldbank.org/v2"
 )
 
 # Confidence threshold (0-100) above which a mobility agency's municipality is

@@ -22,7 +22,7 @@ from datetime import datetime, date
 
 import httpx
 
-from db.config import REST_COUNTRIES_BASE_URL
+from db.config import WORLD_BANK_BASE_URL
 from db.models import MobilityAgency, UncoveredAgency
 from db.session import SessionLocal
 
@@ -138,9 +138,15 @@ def fetch_feed_quality(feed_url: str | None) -> tuple[float, list[str]]:
 
 
 def fetch_population(country_code: str | None, country: str | None) -> int | None:
-    """Country population from REST Countries, used as a market-size proxy
-    since city-level population data isn't reliably available. Cached per
-    run so repeated agencies in the same country cost one HTTP call."""
+    """Country population from the World Bank's open data API, used as a
+    market-size proxy since city-level population data isn't reliably
+    available. Cached per run so repeated agencies in the same country cost
+    one HTTP call.
+
+    Needs an ISO country code — the World Bank's indicator endpoint doesn't
+    support free-text country name lookup, so a row missing country_code
+    (rare: 1 of 4,548 agencies in the first full pull) returns None rather
+    than guessing from the display name."""
 
     cache_key = country_code or country
     if not cache_key:
@@ -148,24 +154,34 @@ def fetch_population(country_code: str | None, country: str | None) -> int | Non
     if cache_key in _population_cache:
         return _population_cache[cache_key]
 
-    url = (
-        f"{REST_COUNTRIES_BASE_URL}/alpha/{country_code}"
-        if country_code
-        else f"{REST_COUNTRIES_BASE_URL}/name/{country}"
-    )
+    if not country_code:
+        logger.warning("No country_code for %r — cannot look up population without one", country)
+        _population_cache[cache_key] = None
+        return None
 
     population = None
     try:
         resp = httpx.get(
-            url, params={"fields": "population"}, timeout=POPULATION_TIMEOUT, follow_redirects=True
+            f"{WORLD_BANK_BASE_URL}/country/{country_code}/indicator/SP.POP.TOTL",
+            params={"format": "json", "per_page": "5"},
+            timeout=POPULATION_TIMEOUT,
+            follow_redirects=True,
         )
         resp.raise_for_status()
-        data = resp.json()
-        record = data[0] if isinstance(data, list) else data
-        population = record.get("population")
+        payload = resp.json()
+        # The API responds [meta, records] — records is None for an unknown
+        # country code, and individual records can have a null value for
+        # years the indicator wasn't reported, so take the first non-null one
+        # (records come back most-recent-first).
+        records = payload[1] if isinstance(payload, list) and len(payload) > 1 else None
+        if records:
+            for record in records:
+                if record and record.get("value") is not None:
+                    population = int(record["value"])
+                    break
     except httpx.HTTPError as exc:
         logger.error("Population lookup failed for %r: %s", cache_key, exc)
-    except (ValueError, IndexError, AttributeError) as exc:
+    except (ValueError, IndexError, TypeError, AttributeError) as exc:
         logger.error("Could not parse population response for %r: %s", cache_key, exc)
 
     _population_cache[cache_key] = population
