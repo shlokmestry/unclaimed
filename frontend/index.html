@@ -1,1 +1,475 @@
-<!-- Step 7: dashboard UI. Implemented in Step 7. -->
+<!-- Step 7 — Frontend dashboard.
+
+Single self-contained file: vanilla HTML/CSS/JS, no framework, no build step.
+Talks to the FastAPI backend (Step 6) over fetch(). See the API_BASE constant
+in the <script> block below — it defaults to localhost:8000 for local
+docker-compose use; update it to the deployed Railway URL after Step 9 (see
+README.md / LOG.md). -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Unclaimed</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --accent:         #2a78d6;
+    --accent-wash:    #eaf2fc;
+    --critical:       #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --accent:         #3987e5;
+      --accent-wash:    #16283d;
+      --critical:       #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --accent:         #3987e5;
+    --accent-wash:    #16283d;
+    --critical:       #e66767;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header h1 {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+
+  header p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0 0 32px;
+    max-width: 640px;
+  }
+
+  /* --- Stat tiles --- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+
+  .stat-tile .label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 8px;
+  }
+
+  .stat-tile .value {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.1;
+    margin: 0;
+  }
+
+  /* --- Controls --- */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .control-group label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  select, input[type="range"] {
+    accent-color: var(--accent);
+  }
+
+  select {
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--baseline);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    min-width: 180px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .slider-row input[type="range"] {
+    width: 180px;
+  }
+
+  .slider-value {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+  }
+
+  /* --- Table --- */
+  .table-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 860px;
+  }
+
+  thead th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gridline);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  thead th:hover {
+    color: var(--text-primary);
+  }
+
+  thead th .arrow {
+    margin-left: 4px;
+    color: var(--accent);
+    display: inline-block;
+    width: 10px;
+  }
+
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gridline);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:hover {
+    background: var(--accent-wash);
+  }
+
+  td.num, th.num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .feed-btn {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  .feed-btn:hover {
+    background: var(--accent-wash);
+  }
+
+  .state-row {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .state-row.error {
+    color: var(--critical);
+  }
+
+  .state-row .icon {
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Unclaimed</h1>
+      <p>Transit agencies with public GTFS feeds not yet covered by Transit app</p>
+    </header>
+
+    <section class="stats" id="stats">
+      <div class="stat-tile">
+        <p class="label">Agencies found</p>
+        <p class="value" id="stat-total">—</p>
+      </div>
+      <div class="stat-tile">
+        <p class="label">Countries represented</p>
+        <p class="value" id="stat-countries">—</p>
+      </div>
+      <div class="stat-tile">
+        <p class="label">Average feed quality</p>
+        <p class="value" id="stat-quality">—</p>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="control-group">
+        <label for="country-filter">Country</label>
+        <select id="country-filter">
+          <option value="">All countries</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="quality-slider">Minimum feed quality</label>
+        <div class="slider-row">
+          <input type="range" id="quality-slider" min="0" max="100" step="5" value="0" />
+          <span class="slider-value" id="quality-slider-value">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="table-card">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-key="name">Agency<span class="arrow"></span></th>
+              <th data-key="country">Country<span class="arrow"></span></th>
+              <th data-key="municipality">City<span class="arrow"></span></th>
+              <th class="num" data-key="population">Population<span class="arrow"></span></th>
+              <th class="num" data-key="quality_score">Feed Quality<span class="arrow"></span></th>
+              <th class="num" data-key="opportunity_score">Opportunity Score<span class="arrow"></span></th>
+              <th>Feed URL</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td colspan="7"><div class="state-row">Loading agencies…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Update this for production once the API is deployed (see README.md).
+    const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? "http://localhost:8000"
+      : "YOUR_RAILWAY_URL";
+
+    let allAgencies = [];
+    let sortKey = "opportunity_score";
+    let sortDir = "desc";
+
+    const tableBody = document.getElementById("table-body");
+    const countryFilter = document.getElementById("country-filter");
+    const qualitySlider = document.getElementById("quality-slider");
+    const qualitySliderValue = document.getElementById("quality-slider-value");
+
+    function numberFormat(n) {
+      if (n === null || n === undefined) return "—";
+      return new Intl.NumberFormat("en-US").format(n);
+    }
+
+    function renderStateRow(message, isError) {
+      tableBody.innerHTML = `<tr><td colspan="7">
+        <div class="state-row ${isError ? "error" : ""}">
+          ${isError ? '<span class="icon">⚠</span>' : ""}${message}
+        </div>
+      </td></tr>`;
+    }
+
+    function renderTable() {
+      let rows = allAgencies.filter((a) => {
+        if (countryFilter.value && a.country !== countryFilter.value) return false;
+        const minQuality = Number(qualitySlider.value);
+        if (minQuality > 0 && (a.quality_score ?? 0) < minQuality) return false;
+        return true;
+      });
+
+      rows = rows.slice().sort((a, b) => {
+        let av = a[sortKey];
+        let bv = b[sortKey];
+        if (av === null || av === undefined) av = sortDir === "asc" ? Infinity : -Infinity;
+        if (bv === null || bv === undefined) bv = sortDir === "asc" ? Infinity : -Infinity;
+        if (typeof av === "string" || typeof bv === "string") {
+          av = (av ?? "").toString().toLowerCase();
+          bv = (bv ?? "").toString().toLowerCase();
+        }
+        if (av < bv) return sortDir === "asc" ? -1 : 1;
+        if (av > bv) return sortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+
+      if (rows.length === 0) {
+        renderStateRow("No agencies match the current filters.", false);
+        return;
+      }
+
+      tableBody.innerHTML = rows
+        .map(
+          (a) => `
+        <tr>
+          <td>${a.name ?? "—"}</td>
+          <td>${a.country ?? "—"}</td>
+          <td>${a.municipality ?? "—"}</td>
+          <td class="num">${numberFormat(a.population)}</td>
+          <td class="num">${a.quality_score ?? "—"}</td>
+          <td class="num">${a.opportunity_score ?? "—"}</td>
+          <td>${
+            a.feed_url
+              ? `<button class="feed-btn" onclick="window.open('${a.feed_url}', '_blank', 'noopener')">View Feed</button>`
+              : "—"
+          }</td>
+        </tr>`
+        )
+        .join("");
+
+      updateSortArrows();
+    }
+
+    function updateSortArrows() {
+      document.querySelectorAll("thead th[data-key]").forEach((th) => {
+        const arrow = th.querySelector(".arrow");
+        if (th.dataset.key === sortKey) {
+          arrow.textContent = sortDir === "asc" ? "▲" : "▼";
+        } else {
+          arrow.textContent = "";
+        }
+      });
+    }
+
+    function populateCountryFilter() {
+      const countries = Array.from(new Set(allAgencies.map((a) => a.country).filter(Boolean))).sort();
+      countryFilter.innerHTML =
+        '<option value="">All countries</option>' +
+        countries.map((c) => `<option value="${c}">${c}</option>`).join("");
+    }
+
+    function renderStats(stats) {
+      document.getElementById("stat-total").textContent = numberFormat(stats.total_uncovered);
+      document.getElementById("stat-countries").textContent = numberFormat(stats.countries_count);
+      document.getElementById("stat-quality").textContent =
+        stats.avg_quality !== null && stats.avg_quality !== undefined
+          ? stats.avg_quality.toFixed(1)
+          : "—";
+    }
+
+    async function loadData() {
+      try {
+        const [agenciesResp, statsResp] = await Promise.all([
+          fetch(`${API_BASE}/agencies`),
+          fetch(`${API_BASE}/stats`),
+        ]);
+
+        if (!agenciesResp.ok || !statsResp.ok) {
+          throw new Error(`API responded with ${agenciesResp.status}/${statsResp.status}`);
+        }
+
+        allAgencies = await agenciesResp.json();
+        const stats = await statsResp.json();
+
+        renderStats(stats);
+        populateCountryFilter();
+        renderTable();
+      } catch (err) {
+        renderStateRow(`Could not load data from the API (${err.message}).`, true);
+      }
+    }
+
+    document.querySelectorAll("thead th[data-key]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (sortKey === key) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          sortDir = "desc";
+        }
+        renderTable();
+      });
+    });
+
+    countryFilter.addEventListener("change", renderTable);
+    qualitySlider.addEventListener("input", () => {
+      qualitySliderValue.textContent = qualitySlider.value;
+      renderTable();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

@@ -35,6 +35,8 @@ services:
     volumes:
       - ./api:/app/api
       - ./ingestion:/app/ingestion
+      - ./db:/app/db
+      - ./run.py:/app/run.py
 
 volumes:
   unclaimed_pgdata:
