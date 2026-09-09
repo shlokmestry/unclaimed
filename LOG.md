@@ -341,3 +341,89 @@ infrastructure instead:
   work happened on `dev` and `main` was still at the Step-1 scaffold commit,
   so the first deploy attempt built nothing (`no "functions", "static", or
   "services" directory`). Fixed by merging `dev` into `main`.
+
+## Post-launch rework: opportunity score, readiness, and a Transit-facing UI
+
+After the first deploy, the brief expanded significantly: a better-weighted
+opportunity score using real signals, a readiness classification, an agency
+detail view, richer stats, a full visual rebuild, and a print-friendly pitch
+page. Written as code only per that request — nothing in this section was
+executed, migrated, re-enriched, or deployed; see the manual steps list.
+
+**New Mobility Database API surfaces used** — both verified against live
+responses before writing code, not assumed:
+- `latest_dataset.downloaded_at` on a GTFS feed record — feed freshness.
+- `/v1/gtfs_rt_feeds`, where each realtime feed's `feed_references` array
+  lists the static feed id(s) it corresponds to — used to build a set of
+  "has realtime" static feed ids in one paginated pull per enrichment run,
+  rather than a per-agency lookup (~3,000x fewer calls).
+
+**Where `feed_last_updated` is captured**: on `MobilityAgency` during Step 2
+(`mobility_db.py` already fetches `latest_dataset` for `feed_url`; this just
+also keeps `downloaded_at`), then copied onto `UncoveredAgency` during Step 5.
+Not re-fetched per-agency during enrichment — Step 2 already has it for every
+feed in one pass.
+
+**route_count/stop_count/trip_count** are parsed from the same already-open
+GTFS zip used for quality scoring (`score_feed()` now returns a dict with
+these alongside `quality_score`/`missing_files`, instead of the old 2-tuple)
+— no second download per agency.
+
+**Opportunity score weights** (population 25%, quality 20%, realtime 25%,
+freshness 20%, network size 10%) are exactly what was specified. Two scaling
+decisions within that: `has_realtime` maps straight to 100/0 before
+weighting (the "then normalised" instruction, read as "put it on the same
+0-100 scale as everything else"); `network_size_score` (route_count) uses
+**plain linear min-max**, not `normalize_populations()`'s log scale — route
+counts don't span the multi-order-of-magnitude range population does, so log
+scaling isn't needed and wasn't asked for. New helper `normalize_linear()` in
+`ingestion/enrichment.py`, tests in `tests/test_enrichment.py`.
+
+**readiness_status** implements the three-way rule exactly as specified,
+with one explicit priority choice: "Dead Feed" is checked before "Ready" —
+an unreachable or >2-year-stale feed can't be "Needs Work" just because it
+happens to also fail a Ready criterion. `quality_score > 70` (not `>=`) per
+the literal "above 70" wording — tested at the boundary
+(`test_boundary_quality_exactly_70_is_not_ready`).
+
+**`GET /agencies/{id}/rank`** — a new endpoint, not explicitly requested but
+needed for the detail view's "Rank among all uncovered agencies" (Improvement
+3). Counts rows with a strictly higher `opportunity_score` rather than
+fetching and ranking all ~2,939 rows client-side just to place one agency.
+
+**`/stats` response shape changed** (`top_5_countries` → `ready_to_onboard`,
+`realtime_count`, `largest_market`) since Improvement 4 replaces the stat
+tiles it fed. This is a breaking API change for any other consumer — none
+exist yet (the dashboard is the only client), so no versioning was added.
+Updated `tests/test_api_integration.py`'s stats assertions and its
+country-filter test (which previously sourced its test country from
+`top_5_countries`, now sources it from a live `/agencies` response instead).
+
+**Agency detail routing uses a hash fragment (`#/agency/{id}`), not a real
+`/agency/{id}` path.** The brief said "no new HTML file needed," and a
+static single-page site serving real path segments needs a server-side SPA
+rewrite (all paths → index.html) or a direct navigation to `/agency/123`
+404s. A hash fragment never reaches the server, so it's bookmarkable and
+back/forward-safe with zero extra Vercel config — no `frontend/vercel.json`
+needed. Trade-off: it's `#/agency/123`, not literally `/agency/123` — flagged
+here rather than silently deviating from the literal path shape asked for.
+
+**Pitch view is `?view=pitch` on the same `index.html`** (also as specified)
+— a query param is checked before the hash so the two routes don't collide.
+Print stylesheet (`@media print`) flips the page to a light, ink-friendly
+palette regardless of the dashboard's dark-by-default theme, and hides the
+"back to dashboard" link (`.no-print`) since it's meaningless on paper/PDF.
+
+**Design tokens**: same real Transit product palette/type-scale established
+earlier in this log (brand green `#27a559`, verified-contrast text greens,
+their neutral gray scale, `ui-sans-serif` fallback stack), now applied
+dark-first unconditionally (not gated behind `prefers-color-scheme`) per
+"dark background stays."
+
+**Migration**: `migrations/001_add_scoring_and_readiness_fields.sql` —
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` throughout, so it's idempotent
+and safe to run against both the local Postgres and Supabase, in either
+order, repeatably. This is the project's first migration file; every
+earlier schema change went through `Base.metadata.create_all()` on a fresh
+table, which doesn't retrofit existing tables — an explicit migration was
+unavoidable once real data already existed to preserve.

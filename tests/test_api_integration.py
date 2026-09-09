@@ -135,12 +135,12 @@ def test_agencies_invalid_sort_by_returns_400(client: httpx.Client):
 # --- 5. country filter --------------------------------------------------
 
 
-def test_agencies_country_filter(client: httpx.Client, stats: dict[str, Any]):
-    # Pick a real country straight out of the live /stats response instead of
-    # hardcoding a guess.
-    assert stats["top_5_countries"], "expected /stats to report at least one country"
-    country = stats["top_5_countries"][0]["country"]
-    assert country
+def test_agencies_country_filter(client: httpx.Client, default_agencies: list[dict[str, Any]]):
+    # Pick a real country straight out of a live /agencies response instead
+    # of hardcoding a guess. (/stats no longer carries a country breakdown —
+    # see the opportunity-score rework in LOG.md.)
+    country = next((row["country"] for row in default_agencies if row["country"]), None)
+    assert country, "expected at least one agency with a country"
 
     resp = client.get("/agencies", params={"country": country})
     assert resp.status_code == 200
@@ -164,6 +164,21 @@ def test_agencies_min_quality_filter(client: httpx.Client):
     rows = resp.json()
     assert len(rows) > 0
     assert all(row["quality_score"] is not None and row["quality_score"] >= 90 for row in rows)
+
+
+# --- 6b. readiness filter (Improvement 2) --------------------------------
+
+
+def test_agencies_readiness_filter(client: httpx.Client):
+    resp = client.get("/agencies", params={"readiness": "Ready"})
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert all(row["readiness_status"] == "Ready" for row in rows)
+
+
+def test_agencies_invalid_readiness_returns_400(client: httpx.Client):
+    resp = client.get("/agencies", params={"readiness": "Not A Real Status"})
+    assert resp.status_code == 400
 
 
 # --- 7. /agencies/{id} --------------------------------------------------
@@ -190,21 +205,34 @@ def test_agency_by_id_not_found(client: httpx.Client):
 
 
 def test_stats_shape_and_sanity(stats: dict[str, Any]):
-    for field in ("total_uncovered", "countries_count", "avg_quality", "top_5_countries"):
+    # Opportunity-score rework (see LOG.md): /stats now reports the six
+    # figures the redesigned dashboard's stat tiles show, replacing the
+    # original three + top_5_countries.
+    for field in (
+        "total_uncovered",
+        "ready_to_onboard",
+        "countries_count",
+        "realtime_count",
+        "avg_quality",
+        "largest_market",
+    ):
         assert field in stats
 
     assert isinstance(stats["total_uncovered"], int)
     assert stats["total_uncovered"] > 0
 
+    assert isinstance(stats["ready_to_onboard"], int)
+    assert 0 <= stats["ready_to_onboard"] <= stats["total_uncovered"]
+
     assert isinstance(stats["countries_count"], int)
     assert stats["countries_count"] > 0
 
-    assert isinstance(stats["top_5_countries"], list)
-    assert len(stats["top_5_countries"]) <= 5
-    for entry in stats["top_5_countries"]:
-        assert "country" in entry
-        assert "count" in entry
-        assert isinstance(entry["count"], int)
+    assert isinstance(stats["realtime_count"], int)
+    assert 0 <= stats["realtime_count"] <= stats["total_uncovered"]
+
+    if stats["largest_market"] is not None:
+        for field in ("name", "country", "population"):
+            assert field in stats["largest_market"]
 
 
 def test_stats_matches_agencies_count(stats: dict[str, Any], default_agencies: list[dict[str, Any]]):

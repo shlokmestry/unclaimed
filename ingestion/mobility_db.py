@@ -102,6 +102,27 @@ def _feed_url(feed: dict) -> str | None:
     return source_info.get("producer_url")
 
 
+def _feed_last_updated(feed: dict) -> datetime | None:
+    """The Mobility Database's own `latest_dataset.downloaded_at` timestamp
+    (ISO 8601, e.g. "2026-08-21T00:00:47.858940Z") — when MobilityData last
+    pulled a fresh copy of this feed, used as the "last updated" signal for
+    the opportunity-score freshness component. Verified against a live feed
+    record before writing this; see LOG.md."""
+
+    latest_dataset = feed.get("latest_dataset") or {}
+    raw = latest_dataset.get("downloaded_at")
+    if not raw:
+        return None
+    try:
+        # datetime.fromisoformat doesn't accept a trailing "Z" before 3.11;
+        # this codebase targets 3.11+ (see api/Dockerfile, .python-version)
+        # but normalize it anyway since it's a one-line defensive parse.
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning("Could not parse latest_dataset.downloaded_at %r for feed %r", raw, feed.get("id"))
+        return None
+
+
 def parse_feed(feed: dict) -> dict:
     """Map one Mobility Database GTFSFeed object to our column shape.
     Every lookup is defensive (.get with fallback) — an unexpected or
@@ -122,6 +143,7 @@ def parse_feed(feed: dict) -> dict:
         "municipality": location.get("municipality"),
         "feed_url": _feed_url(feed),
         "feed_status": feed.get("status"),
+        "feed_last_updated": _feed_last_updated(feed),
     }
 
 
@@ -194,6 +216,7 @@ def upsert_agencies(records: list[dict]) -> int:
                             "municipality": stmt.excluded.municipality,
                             "feed_url": stmt.excluded.feed_url,
                             "feed_status": stmt.excluded.feed_status,
+                            "feed_last_updated": stmt.excluded.feed_last_updated,
                         },
                     )
                     session.execute(stmt)

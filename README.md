@@ -5,8 +5,8 @@ Unclaimed — finds transit agencies with public GTFS feeds not yet covered by T
 ## How it works
 
 - Pulls every public GTFS feed from the [Mobility Database](https://mobilitydatabase.org), and separately gets the list of cities Transit app already covers, then fuzzy-matches agencies to covered cities (country-code-filtered, `rapidfuzz` scored) to find the ones Transit doesn't serve yet.
-- Scores each uncovered agency's feed quality (0-100, based on which required GTFS files are present, row counts, and whether service dates extend into the future) and pulls its country's population as a market-size proxy.
-- Ranks every uncovered agency by an opportunity score — 60% normalized population, 40% feed quality — so the dashboard surfaces the biggest, best-documented gaps first.
+- Scores each uncovered agency's feed quality (0-100, based on which required GTFS files are present, row counts, and whether service dates extend into the future), counts its routes/stops/trips, checks for a linked GTFS-Realtime feed, and pulls its country's population as a market-size proxy.
+- Ranks every uncovered agency by a weighted opportunity score (population 25% / feed quality 20% / has realtime 25% / feed freshness 20% / network size 10%) and classifies each as **Ready** / **Needs Work** / **Dead Feed**, so the dashboard surfaces the biggest, best-documented, most actionable gaps first.
 
 ## Manual setup
 

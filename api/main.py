@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -41,6 +42,10 @@ SORTABLE_COLUMNS = {
     "municipality": UncoveredAgency.municipality,
 }
 
+# Valid readiness_status values (Improvement 2) — validated the same way as
+# sort_by, against a whitelist, rather than passed straight into the query.
+READINESS_VALUES = {"Ready", "Needs Work", "Dead Feed"}
+
 
 class AgencyOut(BaseModel):
     id: int
@@ -54,19 +59,30 @@ class AgencyOut(BaseModel):
     opportunity_score: Optional[float] = None
     missing_files: Optional[list] = None
 
+    # --- Opportunity-score rework fields ---
+    has_realtime: Optional[bool] = None
+    feed_last_updated: Optional[datetime] = None
+    route_count: Optional[int] = None
+    stop_count: Optional[int] = None
+    trip_count: Optional[int] = None
+    readiness_status: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
 
-class CountryCount(BaseModel):
-    country: Optional[str]
-    count: int
+class LargestMarket(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    population: Optional[int] = None
 
 
 class StatsOut(BaseModel):
     total_uncovered: int
+    ready_to_onboard: int
     countries_count: int
+    realtime_count: int
     avg_quality: Optional[float] = None
-    top_5_countries: list[CountryCount]
+    largest_market: Optional[LargestMarket] = None
 
 
 @app.get("/health")
@@ -80,12 +96,21 @@ async def list_agencies(
     order: str = Query("desc", pattern="^(asc|desc)$"),
     country: Optional[str] = Query(None, description="Exact-match country filter"),
     min_quality: Optional[float] = Query(None, ge=0, le=100),
+    readiness: Optional[str] = Query(
+        None, description=f"One of {sorted(READINESS_VALUES)}"
+    ),
 ):
     column = SORTABLE_COLUMNS.get(sort_by)
     if column is None:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid sort_by {sort_by!r}. Must be one of {sorted(SORTABLE_COLUMNS)}",
+        )
+
+    if readiness is not None and readiness not in READINESS_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid readiness {readiness!r}. Must be one of {sorted(READINESS_VALUES)}",
         )
 
     order_clause = column.desc() if order == "desc" else column.asc()
@@ -95,6 +120,8 @@ async def list_agencies(
         stmt = stmt.where(UncoveredAgency.country == country)
     if min_quality is not None:
         stmt = stmt.where(UncoveredAgency.quality_score >= min_quality)
+    if readiness is not None:
+        stmt = stmt.where(UncoveredAgency.readiness_status == readiness)
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(stmt)
@@ -117,28 +144,71 @@ async def get_agency(agency_id: int):
     return row
 
 
+@app.get("/agencies/{agency_id}/rank")
+async def get_agency_rank(agency_id: int):
+    """Where this agency sits in the full opportunity_score ranking (e.g.
+    "#4 of 2,939") — used by the frontend's agency detail view (Improvement
+    3's "Rank among all uncovered agencies"). A dedicated endpoint rather
+    than making the frontend fetch and rank all 2,939 rows itself just to
+    find one agency's position."""
+
+    async with AsyncSessionLocal() as session:
+        agency = await session.get(UncoveredAgency, agency_id)
+        if agency is None:
+            raise HTTPException(status_code=404, detail="Agency not found")
+
+        total = await session.scalar(select(func.count()).select_from(UncoveredAgency))
+
+        if agency.opportunity_score is None:
+            rank = None
+        else:
+            higher_count = await session.scalar(
+                select(func.count())
+                .select_from(UncoveredAgency)
+                .where(UncoveredAgency.opportunity_score > agency.opportunity_score)
+            )
+            rank = higher_count + 1
+
+    return {"rank": rank, "total": total}
+
+
 @app.get("/stats", response_model=StatsOut)
 async def stats():
     async with AsyncSessionLocal() as session:
         total = await session.scalar(select(func.count()).select_from(UncoveredAgency))
+        ready_to_onboard = await session.scalar(
+            select(func.count())
+            .select_from(UncoveredAgency)
+            .where(UncoveredAgency.readiness_status == "Ready")
+        )
         countries_count = await session.scalar(
             select(func.count(func.distinct(UncoveredAgency.country)))
         )
+        realtime_count = await session.scalar(
+            select(func.count())
+            .select_from(UncoveredAgency)
+            .where(UncoveredAgency.has_realtime.is_(True))
+        )
         avg_quality = await session.scalar(select(func.avg(UncoveredAgency.quality_score)))
 
-        top_result = await session.execute(
-            select(UncoveredAgency.country, func.count().label("count"))
-            .group_by(UncoveredAgency.country)
-            .order_by(func.count().desc())
-            .limit(5)
+        largest_result = await session.execute(
+            select(UncoveredAgency.name, UncoveredAgency.country, UncoveredAgency.population)
+            .where(UncoveredAgency.population.is_not(None))
+            .order_by(UncoveredAgency.population.desc())
+            .limit(1)
         )
-        top_countries = [
-            CountryCount(country=row[0], count=row[1]) for row in top_result.all()
-        ]
+        largest_row = largest_result.first()
+        largest_market = (
+            LargestMarket(name=largest_row[0], country=largest_row[1], population=largest_row[2])
+            if largest_row
+            else None
+        )
 
     return StatsOut(
         total_uncovered=total or 0,
+        ready_to_onboard=ready_to_onboard or 0,
         countries_count=countries_count or 0,
+        realtime_count=realtime_count or 0,
         avg_quality=round(avg_quality, 2) if avg_quality is not None else None,
-        top_5_countries=top_countries,
+        largest_market=largest_market,
     )

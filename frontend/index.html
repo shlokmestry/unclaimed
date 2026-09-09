@@ -1,10 +1,23 @@
-<!-- Step 7 — Frontend dashboard.
+<!-- Step 7 — Frontend dashboard, rebuilt per the partnerships/engineering
+feedback pass (see LOG.md "Frontend rebuild for Transit pitch" section for
+the full list of decisions).
 
-Single self-contained file: vanilla HTML/CSS/JS, no framework, no build step.
-Talks to the FastAPI backend (Step 6) over fetch(). See the API_BASE constant
-in the <script> block below — it defaults to localhost:8000 for local
-docker-compose use; update it to the deployed Railway URL after Step 9 (see
-README.md / LOG.md). -->
+Three views in one file, switched via simple show/hide (no build step, no
+router library):
+  - Dashboard (default): stats, Top Opportunities cards, filterable/sortable
+    table.
+  - Agency detail (#/agency/{id}): feed health, market data, actions.
+    Hash-based rather than a real /agency/{id} path — a hash fragment never
+    reaches the server, so it works with zero deploy config (no SPA-fallback
+    rewrite needed) while still being a real, bookmarkable, back/forward-safe
+    URL. See LOG.md.
+  - Pitch (?view=pitch): a print-friendly one-pager meant to be sent to
+    Transit directly or exported as a PDF.
+
+Visual design uses Transit's own real product design tokens (their actual
+app CSS, not the marketing site — see LOG.md for exactly which values came
+from where and the contrast checks run before using them for text), dark by
+default. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,48 +26,25 @@ README.md / LOG.md). -->
 <title>Unclaimed</title>
 <style>
   :root {
-    color-scheme: light;
-    --surface-1:      #fcfcfb;
-    --page-plane:     #f9f9f7;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --gridline:       #e1e0d9;
-    --baseline:       #c3c2b7;
-    --border:         rgba(11,11,11,0.10);
-    --accent:         #2a78d6;
-    --accent-wash:    #eaf2fc;
-    --critical:       #d03b3b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --page-plane:     #0d0d0d;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --gridline:       #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
-      --accent:         #3987e5;
-      --accent-wash:    #16283d;
-      --critical:       #e66767;
-    }
-  }
-  :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --page-plane:     #0d0d0d;
+    --page-plane:     #0f1014;
+    --surface-1:      #18181a;
+    --surface-2:      #232326;
+    --surface-3:      #2f2f33;
     --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --gridline:       #2c2c2a;
-    --baseline:       #383835;
-    --border:         rgba(255,255,255,0.10);
-    --accent:         #3987e5;
-    --accent-wash:    #16283d;
-    --critical:       #e66767;
+    --text-secondary: #c6c6ca;
+    --text-muted:     #909098;
+    --gridline:       #3b3b40;
+    --border:         rgba(255,255,255,0.09);
+    --accent:         #6edc91;   /* AA on dark surfaces */
+    --accent-strong:  #d1fbdb;   /* hover/emphasis on dark */
+    --accent-fill:    #27a559;   /* Transit's real brand green */
+    --accent-wash:    #16301f;
+    --row-alt:        rgba(255,255,255,0.02);
+    --good:           #27a559;
+    --warning:        #ffc247;
+    --critical:       #ff6b57;
+    --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(0,0,0,0.2);
   }
 
   * { box-sizing: border-box; }
@@ -62,68 +52,242 @@ README.md / LOG.md). -->
   body {
     background: var(--page-plane);
     color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
 
   .wrap {
     max-width: 1180px;
     margin: 0 auto;
-    padding: 40px 24px 80px;
+    padding: 40px 24px 60px;
+  }
+
+  a { color: var(--accent); }
+
+  [hidden] { display: none !important; }
+
+  /* --- Header --- */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .brand .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--accent-fill);
+    box-shadow: 0 0 0 4px var(--accent-wash);
+    flex-shrink: 0;
+  }
+
+  .brand span {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
 
   header h1 {
-    font-size: 44px;
-    font-weight: 700;
+    font-size: 42px;
+    font-weight: 800;
     letter-spacing: -0.02em;
     margin: 0 0 8px;
   }
 
-  header p {
+  header p.tagline {
     font-size: 16px;
     color: var(--text-secondary);
     margin: 0 0 32px;
     max-width: 640px;
+    line-height: 1.5;
+  }
+
+  header p.tagline .num {
+    color: var(--accent);
+    font-weight: 700;
   }
 
   /* --- Stat tiles --- */
   .stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 32px;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
   .stat-tile {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px 22px;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-tile::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--accent-fill);
+    opacity: 0.75;
   }
 
   .stat-tile .label {
     font-size: 13px;
     color: var(--text-muted);
-    margin: 0 0 8px;
+    margin: 0 0 6px;
   }
 
   .stat-tile .value {
-    font-size: 32px;
-    font-weight: 600;
-    line-height: 1.1;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .stat-tile .value.text {
+    font-size: 17px;
+    line-height: 1.35;
+  }
+
+  .stat-tile .value .sub {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  /* --- Top Opportunities --- */
+  .section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0 0 12px;
+  }
+
+  .section-heading h2 {
+    font-size: 16px;
+    font-weight: 700;
     margin: 0;
   }
+
+  .section-heading a.pitch-link {
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .top-picks {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .pick-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .pick-card:hover {
+    border-color: var(--accent-fill);
+  }
+
+  .pick-card .pick-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pick-card .pick-place {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+  }
+
+  .pick-card .pick-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pick-card .pick-score {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Readiness badges --- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+
+  .badge .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+  }
+
+  .badge.ready { background: rgba(39,165,89,0.15); color: var(--good); }
+  .badge.ready .badge-dot { background: var(--good); }
+  .badge.needs-work { background: rgba(255,194,71,0.15); color: var(--warning); }
+  .badge.needs-work .badge-dot { background: var(--warning); }
+  .badge.dead-feed { background: rgba(255,107,87,0.15); color: var(--critical); }
+  .badge.dead-feed .badge-dot { background: var(--critical); }
+  .badge.unknown { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+  .badge.unknown .badge-dot { background: var(--text-muted); }
+
+  .row-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    margin-right: 9px;
+    flex-shrink: 0;
+  }
+  .row-dot.ready { background: var(--good); }
+  .row-dot.needs-work { background: var(--warning); }
+  .row-dot.dead-feed { background: var(--critical); }
+  .row-dot.unknown { background: var(--text-muted); }
 
   /* --- Controls --- */
   .controls {
     display: flex;
-    align-items: center;
-    gap: 28px;
+    align-items: end;
+    gap: 18px;
     flex-wrap: wrap;
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 16px 20px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
   }
 
   .control-group {
@@ -134,66 +298,90 @@ README.md / LOG.md). -->
 
   .control-group label {
     font-size: 12px;
+    font-weight: 600;
     color: var(--text-muted);
   }
 
-  select, input[type="range"] {
-    accent-color: var(--accent);
-  }
+  .search-group { flex: 1 1 200px; min-width: 170px; }
 
-  select {
+  input[type="search"], select {
     font: inherit;
     font-size: 14px;
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--baseline);
-    background: var(--surface-1);
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--gridline);
+    background: var(--surface-2);
     color: var(--text-primary);
-    min-width: 180px;
   }
 
-  .slider-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  input[type="search"] { width: 100%; }
+  select { min-width: 160px; }
+
+  input[type="search"]:focus, select:focus {
+    outline: 2px solid var(--accent-fill);
+    outline-offset: 1px;
   }
 
-  .slider-row input[type="range"] {
-    width: 180px;
-  }
+  input[type="range"] { accent-color: var(--accent-fill); }
+
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row input[type="range"] { width: 150px; }
 
   .slider-value {
     font-size: 13px;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
-    min-width: 28px;
+    min-width: 26px;
+  }
+
+  .reset-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--gridline);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .reset-btn:hover { border-color: var(--accent-fill); color: var(--accent); }
+
+  .result-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    padding: 0 4px;
   }
 
   /* --- Table --- */
   .table-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 16px;
     overflow: hidden;
+    box-shadow: var(--shadow);
   }
 
-  .table-scroll {
-    overflow-x: auto;
-  }
+  .table-scroll { overflow-x: auto; max-height: 640px; overflow-y: auto; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-    min-width: 860px;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 960px; }
 
   thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     text-align: left;
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-muted);
+    background: var(--surface-2);
     padding: 12px 16px;
     border-bottom: 1px solid var(--gridline);
     cursor: pointer;
@@ -201,95 +389,356 @@ README.md / LOG.md). -->
     white-space: nowrap;
   }
 
-  thead th:hover {
-    color: var(--text-primary);
-  }
+  thead th:hover { color: var(--text-primary); }
 
-  thead th .arrow {
-    margin-left: 4px;
-    color: var(--accent);
-    display: inline-block;
-    width: 10px;
-  }
+  thead th .arrow { margin-left: 4px; color: var(--accent); display: inline-block; width: 10px; }
+
+  tbody tr { cursor: pointer; }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
 
   tbody td {
-    padding: 12px 16px;
+    padding: 11px 16px;
     border-bottom: 1px solid var(--gridline);
     color: var(--text-primary);
     white-space: nowrap;
   }
 
-  tbody tr:last-child td {
-    border-bottom: none;
-  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-wash); }
 
-  tbody tr:hover {
-    background: var(--accent-wash);
-  }
+  td.name-cell { display: flex; align-items: center; }
 
-  td.num, th.num {
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
+  td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
 
   .feed-btn {
     font: inherit;
     font-size: 13px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: none;
+    background: var(--accent-fill);
+    color: #ffffff;
     cursor: pointer;
   }
 
-  .feed-btn:hover {
-    background: var(--accent-wash);
+  .feed-btn:hover { background: var(--accent-strong); color: #0f1014; }
+
+  .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+  .state-row.error { color: var(--critical); }
+  .state-row .icon { margin-right: 6px; }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--gridline);
+    background: var(--surface-2);
   }
 
-  .state-row {
-    padding: 48px 16px;
+  .page-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--gridline);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
+  .page-btn:not(:disabled):hover { border-color: var(--accent-fill); color: var(--accent); }
+
+  .page-info { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  /* --- Footer --- */
+  footer.site-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-muted);
     text-align: center;
+  }
+
+  /* --- Agency detail view --- */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-secondary);
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 20px;
+  }
+
+  .back-link:hover { color: var(--accent); }
+
+  .detail-header {
+    margin-bottom: 28px;
+  }
+
+  .detail-header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+
+  .detail-header .place {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0 0 12px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 720px) {
+    .detail-grid { grid-template-columns: 1fr; }
+  }
+
+  .detail-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+
+  .detail-card h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 0 0 16px;
+  }
+
+  .kv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gridline);
     font-size: 14px;
   }
 
-  .state-row.error {
+  .kv-row:last-child { border-bottom: none; }
+  .kv-row .k { color: var(--text-muted); }
+  .kv-row .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .missing-files {
+    margin-top: 10px;
+    font-size: 13px;
     color: var(--critical);
   }
 
-  .state-row .icon {
-    margin-right: 6px;
+  .score-bar-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--surface-3);
+    overflow: hidden;
+    margin: 10px 0 4px;
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    background: var(--accent-fill);
+    border-radius: 999px;
+  }
+
+  .actions-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .action-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--gridline);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .action-btn:hover { border-color: var(--accent-fill); color: var(--accent); }
+  .action-btn.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+  .action-btn.primary:hover { background: var(--accent-strong); color: #0f1014; }
+
+  /* --- Pitch view --- */
+  .pitch-wrap { max-width: 900px; margin: 0 auto; padding: 48px 24px 60px; }
+
+  .pitch-wrap h1 { font-size: 36px; font-weight: 800; margin: 0 0 24px; letter-spacing: -0.01em; }
+
+  .pitch-numbers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 600px) {
+    .pitch-numbers { grid-template-columns: 1fr; }
+  }
+
+  .pitch-number {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 20px;
+    text-align: center;
+  }
+
+  .pitch-number .n { font-size: 36px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+  .pitch-number .l { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+  .pitch-context {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+  }
+
+  .pitch-table-wrap {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .pitch-table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pitch-table-wrap thead th {
+    position: static;
+    background: var(--surface-2);
+    font-size: 11px;
+    padding: 10px 12px;
+  }
+  .pitch-table-wrap tbody td { padding: 9px 12px; font-size: 13px; }
+  .pitch-table-wrap tbody tr:nth-child(even) { background: var(--row-alt); }
+
+  .pitch-footer {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media print {
+    :root {
+      color-scheme: light;
+      --page-plane: #ffffff;
+      --surface-1: #ffffff;
+      --surface-2: #f5f5f6;
+      --text-primary: #0b0b0b;
+      --text-secondary: #45454a;
+      --text-muted: #6b6b70;
+      --gridline: #d8d8db;
+      --border: rgba(0,0,0,0.12);
+      --accent: #1e8547;
+      --accent-fill: #1e8547;
+      --row-alt: #f5f5f6;
+      --shadow: none;
+    }
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    .pitch-wrap { max-width: 100%; padding: 0; }
+    .pitch-table-wrap { border: 1px solid #d8d8db; }
+    a { color: #1e8547; text-decoration: none; }
   }
 </style>
 </head>
 <body>
-  <div class="wrap">
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <div class="wrap" id="dashboard-view">
     <header>
+      <div class="brand">
+        <span class="dot"></span>
+        <span>Opportunity finder</span>
+      </div>
       <h1>Unclaimed</h1>
-      <p>Transit agencies with public GTFS feeds not yet covered by Transit app</p>
+      <p class="tagline" id="tagline">
+        <span class="num" id="tagline-count">—</span> transit agencies. Public data. Not yet on Transit app.
+      </p>
     </header>
 
     <section class="stats" id="stats">
       <div class="stat-tile">
-        <p class="label">Agencies found</p>
+        <p class="label">Total uncovered</p>
         <p class="value" id="stat-total">—</p>
       </div>
       <div class="stat-tile">
-        <p class="label">Countries represented</p>
+        <p class="label">Ready to onboard</p>
+        <p class="value" id="stat-ready">—</p>
+      </div>
+      <div class="stat-tile">
+        <p class="label">Countries not covered</p>
         <p class="value" id="stat-countries">—</p>
+      </div>
+      <div class="stat-tile">
+        <p class="label">With realtime feeds</p>
+        <p class="value" id="stat-realtime">—</p>
       </div>
       <div class="stat-tile">
         <p class="label">Average feed quality</p>
         <p class="value" id="stat-quality">—</p>
       </div>
+      <div class="stat-tile">
+        <p class="label">Largest uncovered market</p>
+        <p class="value text" id="stat-largest">—</p>
+      </div>
     </section>
 
+    <div class="section-heading">
+      <h2>Top Opportunities</h2>
+      <a class="pitch-link" href="?view=pitch">View pitch summary →</a>
+    </div>
+    <div class="top-picks" id="top-picks"></div>
+
     <section class="controls">
+      <div class="control-group search-group">
+        <label for="search-input">Search</label>
+        <input type="search" id="search-input" placeholder="Agency or city name…" />
+      </div>
+
       <div class="control-group">
         <label for="country-filter">Country</label>
         <select id="country-filter">
           <option value="">All countries</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="readiness-filter">Readiness</label>
+        <select id="readiness-filter">
+          <option value="">All</option>
+          <option value="Ready">Ready</option>
+          <option value="Needs Work">Needs Work</option>
+          <option value="Dead Feed">Dead Feed</option>
         </select>
       </div>
 
@@ -300,7 +749,11 @@ README.md / LOG.md). -->
           <span class="slider-value" id="quality-slider-value">0</span>
         </div>
       </div>
+
+      <button class="reset-btn" id="reset-btn" type="button">Reset filters</button>
     </section>
+
+    <div class="result-meta" id="result-meta"></div>
 
     <section class="table-card">
       <div class="table-scroll">
@@ -321,7 +774,103 @@ README.md / LOG.md). -->
           </tbody>
         </table>
       </div>
+      <div class="pagination" id="pagination" hidden>
+        <button class="page-btn" id="prev-page" type="button">← Prev</button>
+        <span class="page-info" id="page-info"></span>
+        <button class="page-btn" id="next-page" type="button">Next →</button>
+      </div>
     </section>
+
+    <footer class="site-footer">
+      Built using Mobility Database open data. Not affiliated with Transit app.
+    </footer>
+  </div>
+
+  <!-- ============ AGENCY DETAIL VIEW ============ -->
+  <div class="wrap" id="detail-view" hidden>
+    <button class="back-link" id="back-btn" type="button">← Back to all agencies</button>
+
+    <div class="detail-header">
+      <h1 id="detail-name">—</h1>
+      <p class="place" id="detail-place">—</p>
+      <span class="badge" id="detail-badge"></span>
+    </div>
+
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h3>Feed health</h3>
+        <div class="kv-row"><span class="k">Last updated</span><span class="v" id="detail-updated">—</span></div>
+        <div class="kv-row"><span class="k">Routes</span><span class="v" id="detail-routes">—</span></div>
+        <div class="kv-row"><span class="k">Stops</span><span class="v" id="detail-stops">—</span></div>
+        <div class="kv-row"><span class="k">Trips</span><span class="v" id="detail-trips">—</span></div>
+        <div class="kv-row"><span class="k">Realtime feed</span><span class="v" id="detail-realtime">—</span></div>
+        <div class="kv-row"><span class="k">Quality score</span><span class="v" id="detail-quality">—</span></div>
+        <div class="missing-files" id="detail-missing" hidden></div>
+      </div>
+
+      <div class="detail-card">
+        <h3>Market</h3>
+        <div class="kv-row"><span class="k">Country population</span><span class="v" id="detail-population">—</span></div>
+        <div class="kv-row"><span class="k">Rank</span><span class="v" id="detail-rank">—</span></div>
+        <p style="margin: 14px 0 4px; font-size: 13px; color: var(--text-muted);">Opportunity score</p>
+        <div class="score-bar-track"><div class="score-bar-fill" id="detail-score-bar" style="width:0%"></div></div>
+        <p style="margin: 0; font-size: 22px; font-weight: 800;" id="detail-score-num">—</p>
+      </div>
+    </div>
+
+    <div class="detail-card">
+      <h3>Actions</h3>
+      <div class="actions-row">
+        <button class="action-btn primary" id="detail-view-feed">View / download feed</button>
+        <button class="action-btn" id="detail-copy-url">Copy Feed URL</button>
+        <a class="action-btn" id="detail-mdb-link" href="#" target="_blank" rel="noopener">View on Mobility Database</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PITCH VIEW ============ -->
+  <div class="pitch-wrap" id="pitch-view" hidden>
+    <h1>What Unclaimed found</h1>
+
+    <div class="pitch-numbers">
+      <div class="pitch-number">
+        <div class="n" id="pitch-total">—</div>
+        <div class="l">Uncovered agencies</div>
+      </div>
+      <div class="pitch-number">
+        <div class="n" id="pitch-ready">—</div>
+        <div class="l">Ready to onboard today</div>
+      </div>
+      <div class="pitch-number">
+        <div class="n" id="pitch-countries">—</div>
+        <div class="l">Countries not yet covered</div>
+      </div>
+    </div>
+
+    <p class="pitch-context">
+      These agencies have published their transit data as open GTFS feeds — the same format Transit app already ingests. They are not covered by Transit app today. The ones marked Ready have clean, recently updated feeds with realtime data available.
+    </p>
+
+    <div class="pitch-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Agency</th>
+            <th>Country</th>
+            <th>City</th>
+            <th>Realtime</th>
+            <th>Readiness</th>
+            <th>Feed URL</th>
+          </tr>
+        </thead>
+        <tbody id="pitch-table-body"></tbody>
+      </table>
+    </div>
+
+    <div class="pitch-footer no-print">
+      <a href="/">← Back to the full dashboard</a>
+    </div>
   </div>
 
   <script>
@@ -329,14 +878,31 @@ README.md / LOG.md). -->
       ? "http://localhost:8000"
       : "https://unclaimed-api.vercel.app";
 
+    const PAGE_SIZE = 50;
+
     let allAgencies = [];
+    let latestStats = null;
     let sortKey = "opportunity_score";
     let sortDir = "desc";
+    let currentPage = 1;
+
+    const dashboardView = document.getElementById("dashboard-view");
+    const detailView = document.getElementById("detail-view");
+    const pitchView = document.getElementById("pitch-view");
 
     const tableBody = document.getElementById("table-body");
     const countryFilter = document.getElementById("country-filter");
+    const readinessFilter = document.getElementById("readiness-filter");
     const qualitySlider = document.getElementById("quality-slider");
     const qualitySliderValue = document.getElementById("quality-slider-value");
+    const searchInput = document.getElementById("search-input");
+    const resetBtn = document.getElementById("reset-btn");
+    const resultMeta = document.getElementById("result-meta");
+    const pagination = document.getElementById("pagination");
+    const prevPageBtn = document.getElementById("prev-page");
+    const nextPageBtn = document.getElementById("next-page");
+    const pageInfo = document.getElementById("page-info");
+    const topPicks = document.getElementById("top-picks");
 
     function numberFormat(n) {
       if (n === null || n === undefined) return "—";
@@ -357,7 +923,77 @@ README.md / LOG.md). -->
         .replace(/'/g, "&#39;");
     }
 
+    function readinessSlug(status) {
+      if (status === "Ready") return "ready";
+      if (status === "Needs Work") return "needs-work";
+      if (status === "Dead Feed") return "dead-feed";
+      return "unknown";
+    }
+
+    function readinessBadge(status) {
+      const slug = readinessSlug(status);
+      const label = status || "Unknown";
+      return `<span class="badge ${slug}"><span class="badge-dot"></span>${escapeHtml(label)}</span>`;
+    }
+
+    // Updates an existing badge element in place (className + content)
+    // rather than replacing it via outerHTML — keeps the element's id
+    // stable so callers don't need to re-query the DOM afterward.
+    function setReadinessBadge(el, status) {
+      const slug = readinessSlug(status);
+      const label = status || "Unknown";
+      el.className = `badge ${slug}`;
+      el.innerHTML = `<span class="badge-dot"></span>${escapeHtml(label)}`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "Unknown";
+      try {
+        return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+      } catch (e) {
+        return "Unknown";
+      }
+    }
+
+    // ---------- routing ----------
+
+    function getRoute() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("view") === "pitch") return { view: "pitch" };
+
+      const match = window.location.hash.match(/^#\/agency\/(\d+)$/);
+      if (match) return { view: "detail", id: Number(match[1]) };
+
+      return { view: "dashboard" };
+    }
+
+    function showView(route) {
+      dashboardView.hidden = route.view !== "dashboard";
+      detailView.hidden = route.view !== "detail";
+      pitchView.hidden = route.view !== "pitch";
+
+      if (route.view === "detail") {
+        renderDetail(route.id);
+      } else if (route.view === "pitch") {
+        renderPitch();
+      }
+    }
+
+    function goToAgency(id) {
+      window.location.hash = `#/agency/${id}`;
+    }
+
+    document.getElementById("back-btn").addEventListener("click", () => {
+      window.location.hash = "";
+    });
+
+    window.addEventListener("hashchange", () => showView(getRoute()));
+
+    // ---------- dashboard rendering ----------
+
     function renderStateRow(message, isError) {
+      pagination.hidden = true;
+      resultMeta.textContent = "";
       tableBody.innerHTML = `<tr><td colspan="7">
         <div class="state-row ${isError ? "error" : ""}">
           ${isError ? '<span class="icon">⚠</span>' : ""}${message}
@@ -365,11 +1001,18 @@ README.md / LOG.md). -->
       </td></tr>`;
     }
 
-    function renderTable() {
+    function getFilteredSorted() {
+      const query = searchInput.value.trim().toLowerCase();
+
       let rows = allAgencies.filter((a) => {
         if (countryFilter.value && a.country !== countryFilter.value) return false;
+        if (readinessFilter.value && a.readiness_status !== readinessFilter.value) return false;
         const minQuality = Number(qualitySlider.value);
         if (minQuality > 0 && (a.quality_score ?? 0) < minQuality) return false;
+        if (query) {
+          const haystack = `${a.name ?? ""} ${a.municipality ?? ""}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
         return true;
       });
 
@@ -387,16 +1030,50 @@ README.md / LOG.md). -->
         return 0;
       });
 
-      if (rows.length === 0) {
+      return rows;
+    }
+
+    function renderTopPicks() {
+      const top5 = allAgencies
+        .slice()
+        .sort((a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1))
+        .slice(0, 5);
+
+      topPicks.innerHTML = top5
+        .map(
+          (a) => `
+        <div class="pick-card" data-id="${a.id}">
+          <p class="pick-name">${escapeHtml(a.name) || "—"}</p>
+          <p class="pick-place">${escapeHtml(a.municipality) ? escapeHtml(a.municipality) + ", " : ""}${escapeHtml(a.country) || "—"}</p>
+          ${readinessBadge(a.readiness_status)}
+          <div class="pick-foot" style="margin-top:10px;">
+            <span class="pick-score">${a.opportunity_score ?? "—"}</span>
+            <button class="feed-btn" data-view-id="${a.id}" type="button">View</button>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    function renderTable() {
+      const filtered = getFilteredSorted();
+
+      if (filtered.length === 0) {
         renderStateRow("No agencies match the current filters.", false);
         return;
       }
 
-      tableBody.innerHTML = rows
-        .map(
-          (a) => `
-        <tr>
-          <td>${escapeHtml(a.name) || "—"}</td>
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      currentPage = Math.min(currentPage, totalPages);
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+      resultMeta.textContent = `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, filtered.length)} of ${numberFormat(filtered.length)} agencies${filtered.length !== allAgencies.length ? ` (filtered from ${numberFormat(allAgencies.length)})` : ""}`;
+
+      tableBody.innerHTML = pageRows
+        .map((a) => `
+        <tr data-id="${a.id}">
+          <td class="name-cell"><span class="row-dot ${readinessSlug(a.readiness_status)}"></span>${escapeHtml(a.name) || "—"}</td>
           <td>${escapeHtml(a.country) || "—"}</td>
           <td>${escapeHtml(a.municipality) || "—"}</td>
           <td class="num">${numberFormat(a.population)}</td>
@@ -407,9 +1084,13 @@ README.md / LOG.md). -->
               ? `<button class="feed-btn" data-feed-url="${escapeHtml(a.feed_url)}">View Feed</button>`
               : "—"
           }</td>
-        </tr>`
-        )
+        </tr>`)
         .join("");
+
+      pagination.hidden = totalPages <= 1;
+      prevPageBtn.disabled = currentPage <= 1;
+      nextPageBtn.disabled = currentPage >= totalPages;
+      pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
 
       updateSortArrows();
     }
@@ -434,11 +1115,18 @@ README.md / LOG.md). -->
 
     function renderStats(stats) {
       document.getElementById("stat-total").textContent = numberFormat(stats.total_uncovered);
+      document.getElementById("stat-ready").textContent = numberFormat(stats.ready_to_onboard);
       document.getElementById("stat-countries").textContent = numberFormat(stats.countries_count);
+      document.getElementById("stat-realtime").textContent = numberFormat(stats.realtime_count);
       document.getElementById("stat-quality").textContent =
-        stats.avg_quality !== null && stats.avg_quality !== undefined
-          ? stats.avg_quality.toFixed(1)
-          : "—";
+        stats.avg_quality !== null && stats.avg_quality !== undefined ? stats.avg_quality.toFixed(1) : "—";
+
+      const lm = stats.largest_market;
+      document.getElementById("stat-largest").innerHTML = lm && lm.name
+        ? `${escapeHtml(lm.name)}<span class="sub">${escapeHtml(lm.country) || ""} · ${numberFormat(lm.population)}</span>`
+        : "—";
+
+      document.getElementById("tagline-count").textContent = numberFormat(stats.total_uncovered);
     }
 
     async function loadData() {
@@ -453,15 +1141,137 @@ README.md / LOG.md). -->
         }
 
         allAgencies = await agenciesResp.json();
-        const stats = await statsResp.json();
+        latestStats = await statsResp.json();
 
-        renderStats(stats);
+        renderStats(latestStats);
         populateCountryFilter();
+        renderTopPicks();
         renderTable();
+        showView(getRoute());
       } catch (err) {
         renderStateRow(`Could not load data from the API (${err.message}).`, true);
       }
     }
+
+    // ---------- agency detail view ----------
+
+    async function renderDetail(id) {
+      const badgeEl = document.getElementById("detail-badge");
+      document.getElementById("detail-name").textContent = "Loading…";
+      document.getElementById("detail-place").textContent = "";
+      badgeEl.className = "badge";
+      badgeEl.innerHTML = "";
+
+      let agency = allAgencies.find((a) => a.id === id);
+      try {
+        if (!agency) {
+          const resp = await fetch(`${API_BASE}/agencies/${id}`);
+          if (!resp.ok) throw new Error(`Agency not found (${resp.status})`);
+          agency = await resp.json();
+        }
+
+        document.getElementById("detail-name").textContent = agency.name || "—";
+        document.getElementById("detail-place").textContent =
+          [agency.municipality, agency.country].filter(Boolean).join(", ") || "—";
+        setReadinessBadge(badgeEl, agency.readiness_status);
+
+        document.getElementById("detail-updated").textContent = formatDate(agency.feed_last_updated);
+        document.getElementById("detail-routes").textContent = numberFormat(agency.route_count);
+        document.getElementById("detail-stops").textContent = numberFormat(agency.stop_count);
+        document.getElementById("detail-trips").textContent = numberFormat(agency.trip_count);
+        document.getElementById("detail-realtime").textContent = agency.has_realtime ? "Yes" : "No";
+        document.getElementById("detail-quality").textContent =
+          agency.quality_score !== null && agency.quality_score !== undefined ? `${agency.quality_score} / 100` : "—";
+
+        const missingEl = document.getElementById("detail-missing");
+        if (agency.missing_files && agency.missing_files.length) {
+          missingEl.hidden = false;
+          missingEl.textContent = `Missing: ${agency.missing_files.join(", ")}`;
+        } else {
+          missingEl.hidden = true;
+        }
+
+        document.getElementById("detail-population").textContent = numberFormat(agency.population);
+        document.getElementById("detail-score-num").textContent = agency.opportunity_score ?? "—";
+        document.getElementById("detail-score-bar").style.width = `${Math.max(0, Math.min(100, agency.opportunity_score ?? 0))}%`;
+
+        const rankEl = document.getElementById("detail-rank");
+        rankEl.textContent = "…";
+        fetch(`${API_BASE}/agencies/${id}/rank`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            rankEl.textContent = data && data.rank
+              ? `#${numberFormat(data.rank)} of ${numberFormat(data.total)}`
+              : "—";
+          })
+          .catch(() => { rankEl.textContent = "—"; });
+
+        const viewFeedBtn = document.getElementById("detail-view-feed");
+        viewFeedBtn.onclick = () => {
+          if (agency.feed_url) window.open(agency.feed_url, "_blank", "noopener");
+        };
+
+        const copyBtn = document.getElementById("detail-copy-url");
+        copyBtn.textContent = "Copy Feed URL";
+        copyBtn.onclick = async () => {
+          if (!agency.feed_url) return;
+          try {
+            await navigator.clipboard.writeText(agency.feed_url);
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => { copyBtn.textContent = "Copy Feed URL"; }, 1500);
+          } catch (e) {
+            copyBtn.textContent = "Couldn't copy";
+          }
+        };
+
+        const mdbLink = document.getElementById("detail-mdb-link");
+        mdbLink.href = `https://mobilitydatabase.org/feeds?search=${encodeURIComponent(agency.name || "")}`;
+      } catch (err) {
+        document.getElementById("detail-name").textContent = "Agency not found";
+        document.getElementById("detail-place").textContent = err.message;
+      }
+    }
+
+    // ---------- pitch view ----------
+
+    async function renderPitch() {
+      if (!latestStats || allAgencies.length === 0) {
+        await new Promise((resolve) => {
+          const check = setInterval(() => {
+            if (latestStats && allAgencies.length > 0) {
+              clearInterval(check);
+              resolve();
+            }
+          }, 100);
+        });
+      }
+
+      document.getElementById("pitch-total").textContent = numberFormat(latestStats.total_uncovered);
+      document.getElementById("pitch-ready").textContent = numberFormat(latestStats.ready_to_onboard);
+      document.getElementById("pitch-countries").textContent = numberFormat(latestStats.countries_count);
+
+      const top20 = allAgencies
+        .slice()
+        .sort((a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1))
+        .slice(0, 20);
+
+      document.getElementById("pitch-table-body").innerHTML = top20
+        .map(
+          (a, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${escapeHtml(a.name) || "—"}</td>
+          <td>${escapeHtml(a.country) || "—"}</td>
+          <td>${escapeHtml(a.municipality) || "—"}</td>
+          <td>${a.has_realtime ? "Yes" : "No"}</td>
+          <td>${escapeHtml(a.readiness_status) || "Unknown"}</td>
+          <td>${a.feed_url ? `<a href="${escapeHtml(a.feed_url)}" target="_blank" rel="noopener">Feed</a>` : "—"}</td>
+        </tr>`
+        )
+        .join("");
+    }
+
+    // ---------- event wiring ----------
 
     document.querySelectorAll("thead th[data-key]").forEach((th) => {
       th.addEventListener("click", () => {
@@ -472,25 +1282,61 @@ README.md / LOG.md). -->
           sortKey = key;
           sortDir = "desc";
         }
+        currentPage = 1;
         renderTable();
       });
     });
 
-    countryFilter.addEventListener("change", renderTable);
+    countryFilter.addEventListener("change", () => { currentPage = 1; renderTable(); });
+    readinessFilter.addEventListener("change", () => { currentPage = 1; renderTable(); });
     qualitySlider.addEventListener("input", () => {
       qualitySliderValue.textContent = qualitySlider.value;
+      currentPage = 1;
       renderTable();
     });
 
-    // Delegated click handler for "View Feed" buttons — reads the URL from
-    // a data attribute (escaped at render time) rather than an inline
-    // onclick, which would otherwise need the raw URL string-interpolated
-    // into JS source.
+    let searchDebounce;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(() => { currentPage = 1; renderTable(); }, 150);
+    });
+
+    resetBtn.addEventListener("click", () => {
+      countryFilter.value = "";
+      readinessFilter.value = "";
+      qualitySlider.value = 0;
+      qualitySliderValue.textContent = "0";
+      searchInput.value = "";
+      sortKey = "opportunity_score";
+      sortDir = "desc";
+      currentPage = 1;
+      renderTable();
+    });
+
+    prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage -= 1; renderTable(); } });
+    nextPageBtn.addEventListener("click", () => { currentPage += 1; renderTable(); });
+
+    // Delegated click handlers — table rows and pick cards navigate to the
+    // detail view; "View Feed" buttons (in a row or a pick card) open the
+    // raw feed directly and must not also trigger row navigation.
     tableBody.addEventListener("click", (e) => {
-      const btn = e.target.closest(".feed-btn");
-      if (btn && btn.dataset.feedUrl) {
-        window.open(btn.dataset.feedUrl, "_blank", "noopener");
+      const feedBtn = e.target.closest(".feed-btn");
+      if (feedBtn && feedBtn.dataset.feedUrl) {
+        window.open(feedBtn.dataset.feedUrl, "_blank", "noopener");
+        return;
       }
+      const row = e.target.closest("tr[data-id]");
+      if (row) goToAgency(row.dataset.id);
+    });
+
+    topPicks.addEventListener("click", (e) => {
+      const viewBtn = e.target.closest("[data-view-id]");
+      if (viewBtn) {
+        goToAgency(viewBtn.dataset.viewId);
+        return;
+      }
+      const card = e.target.closest(".pick-card[data-id]");
+      if (card) goToAgency(card.dataset.id);
     });
 
     loadData();

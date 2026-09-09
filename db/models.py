@@ -64,6 +64,14 @@ class MobilityAgency(Base):
     match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     matched_to: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Mobility Database's own `latest_dataset.downloaded_at` timestamp,
+    # captured once here during Step 2 ingestion (which already fetches this
+    # field, just didn't store it) rather than re-fetched per-agency during
+    # enrichment — avoids ~3,000 redundant API calls. Propagated onto
+    # UncoveredAgency.feed_last_updated for uncovered agencies in Step 5.
+    # See LOG.md (opportunity-score rework).
+    feed_last_updated: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class TransitCovered(Base):
     """Cities/regions Transit app already covers (Step 3)."""
@@ -106,3 +114,14 @@ class UncoveredAgency(Base):
     missing_files: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # --- Opportunity-score rework fields (see LOG.md) ---
+    has_realtime: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    feed_last_updated: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    route_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stop_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    trip_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # "Ready" | "Needs Work" | "Dead Feed" — see compute_readiness() in
+    # ingestion/enrichment.py for the exact rule and LOG.md for rationale.
+    readiness_status: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
