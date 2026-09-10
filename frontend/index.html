@@ -885,6 +885,10 @@ default. -->
     let sortKey = "opportunity_score";
     let sortDir = "desc";
     let currentPage = 1;
+    // Bumped on every renderDetail() call; a rank fetch discards its result
+    // if this has moved on by the time it resolves, so navigating between
+    // two agencies quickly can't leave a stale rank from the first one.
+    let detailRequestToken = 0;
 
     const dashboardView = document.getElementById("dashboard-view");
     const detailView = document.getElementById("detail-view");
@@ -967,7 +971,7 @@ default. -->
       return { view: "dashboard" };
     }
 
-    function showView(route) {
+    function showView(route, loadError) {
       dashboardView.hidden = route.view !== "dashboard";
       detailView.hidden = route.view !== "detail";
       pitchView.hidden = route.view !== "pitch";
@@ -975,7 +979,7 @@ default. -->
       if (route.view === "detail") {
         renderDetail(route.id);
       } else if (route.view === "pitch") {
-        renderPitch();
+        renderPitch(loadError);
       }
     }
 
@@ -1130,6 +1134,7 @@ default. -->
     }
 
     async function loadData() {
+      let loadError = null;
       try {
         const [agenciesResp, statsResp] = await Promise.all([
           fetch(`${API_BASE}/agencies`),
@@ -1147,15 +1152,23 @@ default. -->
         populateCountryFilter();
         renderTopPicks();
         renderTable();
-        showView(getRoute());
       } catch (err) {
+        loadError = err;
         renderStateRow(`Could not load data from the API (${err.message}).`, true);
       }
+
+      // Route to the correct view regardless of load outcome — otherwise a
+      // failed load leaves a `?view=pitch` or `#/agency/id` visitor looking
+      // at the dashboard's error state instead of the view their URL asked
+      // for. Each view's own render function handles loadError/empty data.
+      showView(getRoute(), loadError);
     }
 
     // ---------- agency detail view ----------
 
     async function renderDetail(id) {
+      const requestToken = ++detailRequestToken;
+
       const badgeEl = document.getElementById("detail-badge");
       document.getElementById("detail-name").textContent = "Loading…";
       document.getElementById("detail-place").textContent = "";
@@ -1200,11 +1213,18 @@ default. -->
         fetch(`${API_BASE}/agencies/${id}/rank`)
           .then((r) => (r.ok ? r.json() : null))
           .then((data) => {
+            // Discard if the user has already navigated to a different
+            // agency since this fetch started — otherwise a slower response
+            // for a previous agency can overwrite the current one's rank.
+            if (requestToken !== detailRequestToken) return;
             rankEl.textContent = data && data.rank
               ? `#${numberFormat(data.rank)} of ${numberFormat(data.total)}`
               : "—";
           })
-          .catch(() => { rankEl.textContent = "—"; });
+          .catch(() => {
+            if (requestToken !== detailRequestToken) return;
+            rankEl.textContent = "—";
+          });
 
         const viewFeedBtn = document.getElementById("detail-view-feed");
         viewFeedBtn.onclick = () => {
@@ -1234,16 +1254,48 @@ default. -->
 
     // ---------- pitch view ----------
 
-    async function renderPitch() {
+    function renderPitchError(message) {
+      for (const id of ["pitch-total", "pitch-ready", "pitch-countries"]) {
+        document.getElementById(id).textContent = "—";
+      }
+      document.getElementById("pitch-table-body").innerHTML =
+        `<tr><td colspan="7" class="state-row error"><span class="icon">⚠</span>${escapeHtml(message)}</td></tr>`;
+    }
+
+    async function renderPitch(loadError) {
+      if (loadError) {
+        renderPitchError(`Could not load data from the API (${loadError.message}).`);
+        return;
+      }
+
       if (!latestStats || allAgencies.length === 0) {
-        await new Promise((resolve) => {
+        // loadData() hasn't finished yet (e.g. this is the very first paint
+        // and the fetch is still in flight) — wait for it, but bounded: if
+        // it never arrives (a failure not routed through the loadError
+        // param above, or loadData() simply hasn't been called this way),
+        // show an error instead of hanging on "—" placeholders forever.
+        const arrived = await new Promise((resolve) => {
+          let waited = 0;
+          const interval = 100;
+          const timeoutMs = 15000;
           const check = setInterval(() => {
             if (latestStats && allAgencies.length > 0) {
               clearInterval(check);
-              resolve();
+              resolve(true);
+              return;
             }
-          }, 100);
+            waited += interval;
+            if (waited >= timeoutMs) {
+              clearInterval(check);
+              resolve(false);
+            }
+          }, interval);
         });
+
+        if (!arrived) {
+          renderPitchError("Could not load data from the API (timed out).");
+          return;
+        }
       }
 
       document.getElementById("pitch-total").textContent = numberFormat(latestStats.total_uncovered);
