@@ -125,3 +125,10 @@ class UncoveredAgency(Base):
     # "Ready" | "Needs Work" | "Dead Feed" — see compute_readiness() in
     # ingestion/enrichment.py for the exact rule and LOG.md for rationale.
     readiness_status: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+
+    # True if this "feed" is very likely a regional/national aggregator or
+    # open-data platform (e.g. "DELFI Germany-wide scheduled timetable data",
+    # a transport ministry, a multi-operator bundle) rather than a single
+    # onboardable transit agency. See is_probable_aggregator() in
+    # ingestion/enrichment.py and LOG.md for why this exists.
+    is_probable_aggregator: Mapped[bool | None] = mapped_column(Boolean, nullable=True, index=True)

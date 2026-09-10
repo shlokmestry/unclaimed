@@ -1049,7 +1049,14 @@ default. -->
     }
 
     function renderTopPicks() {
+      // Excludes rows flagged as probable regional/national aggregators
+      // (DELFI, BODS, ministries, multi-operator bundles) — this section is
+      // meant to spotlight individually onboardable agencies, and an
+      // aggregator's huge stop/route counts would otherwise dominate the
+      // top of the ranking. See is_probable_aggregator in
+      // ingestion/enrichment.py and LOG.md.
       const top5 = allAgencies
+        .filter((a) => !a.is_probable_aggregator)
         .slice()
         .sort((a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1))
         .slice(0, 5);
@@ -1313,7 +1320,11 @@ default. -->
       document.getElementById("pitch-ready").textContent = numberFormat(latestStats.ready_to_onboard);
       document.getElementById("pitch-countries").textContent = numberFormat(latestStats.countries_count);
 
+      // Same aggregator exclusion as renderTopPicks() — see the comment
+      // there. This table is the headline of the pitch page, so it matters
+      // even more here.
       const top20 = allAgencies
+        .filter((a) => !a.is_probable_aggregator)
         .slice()
         .sort((a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1))
         .slice(0, 20);

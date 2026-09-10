@@ -240,6 +240,50 @@ on `quality_score`. Confirmed via the final sanity check: 12/2,939 (0.4%) of
 uncovered agencies hit this — small enough to leave as-is rather than adding
 a special case for one territory.
 
+**Aggregator feeds found dominating the top of the ranking, fixed** (found
+during a pre-outreach sanity pass on the live deployed data, not during
+development): the Mobility Database treats one GTFS feed as one "agency"
+row, but some feeds are actually regional/national open-data platforms
+(`DELFI Germany-wide scheduled timetable data`, `BODS UK aggregate feed`,
+`Trafiklab`), transport ministries, or multi-operator bundles (a feed name
+listing 9+ separate agencies). Their sheer scale (the #1-ranked row had
+677,741 stops and 23,819 routes — no single real transit agency has that;
+the dataset's median is ~219 stops / ~15 routes) pushed them to the very
+top of `opportunity_score`, ahead of real single-agency opportunities like
+MBTA/SEPTA, and 53 of them were counted in the "Ready" stat used in the
+outreach email's headline number.
+
+Added `is_probable_aggregator` (`ingestion/enrichment.py`,
+`migrations/002_add_aggregator_flag.sql`), flagged when a feed's name lists
+>= 2 comma-separated operators, or `route_count > 3000`, or
+`stop_count > 20000` — thresholds picked by inspecting the actual
+distribution (2nd-highest real single-agency route_count in the dataset is
+well under 500; every flagged row is 3-100x that). Flags 111 of 2,939 rows
+(3.8%). Flagged rows are **not deleted or hidden from the full
+dashboard/API** — the data is still real and potentially useful (Transit
+might genuinely want to know DELFI exists as a platform-level integration,
+just not as a "sign up this one agency" lead) — they're excluded from
+`/stats.ready_to_onboard` (1,117 → 1,064) and from the frontend's "Top
+Opportunities" cards and the pitch page's top-20 table, since those are
+specifically meant to be individually actionable single-agency leads. The
+migration backfills existing Supabase rows with the same heuristic via SQL
+(`LENGTH(name) - LENGTH(REPLACE(name, ',', ''))`) rather than re-running the
+full multi-hour enrichment pipeline just for this — verified the backfilled
+counts match the Python heuristic exactly (111 flagged, 53 flagged-and-Ready)
+before treating it as done.
+
+One coincidental oddity noticed but not chased further: `Rursee-Schifffahrt
+KG` (a small German boat-tour operator) and `DELFI Germany-wide scheduled
+timetable data (GTFS)` have identical stop_count/route_count/
+opportunity_score (552,956 / 29,607 / 68.21) despite different feed URLs.
+Checked `enrichment.py` for a caching bug that could explain it (none found
+— only population is cached, keyed by country, which is correct) and it's
+plausible the small operator's Mobility Database feed is itself a re-export
+of DELFI's national aggregate data rather than an independent one. Both are
+now flagged as probable aggregators regardless (stop_count alone clears the
+threshold by 27x), so it doesn't affect the fix above, but worth knowing
+the underlying stats aren't independently verified in this case.
+
 **Not fixed, deliberately**: enrichment's per-agency feed downloads and
 population lookups run strictly sequentially (`httpx` synchronous calls in a
 loop). They're independent per agency and could be parallelized (e.g.

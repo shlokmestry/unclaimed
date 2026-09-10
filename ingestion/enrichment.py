@@ -60,6 +60,37 @@ READY_MIN_ROUTES = 5
 READY_MIN_STOPS = 20
 DEAD_MAX_STALE_DAYS = 730  # >2 years or unknown => Dead Feed
 
+# Aggregator-detection thresholds — found by inspecting the live top of the
+# opportunity_score ranking (see LOG.md "aggregator feeds" entry): a handful
+# of Mobility Database "feeds" are actually regional/national open-data
+# platforms (DELFI, BODS, Trafiklab), ministries, or bundled multi-operator
+# exports, not a single agency Transit could onboard. Their sheer size
+# (tens of thousands of stops/routes, vs. a median of ~220/~15 for a real
+# single agency) otherwise pushes them to the very top of the ranking ahead
+# of real single-agency opportunities like MBTA/SEPTA.
+AGGREGATOR_MIN_COMMA_NAMES = 2  # e.g. "Metro Transit, Sound Transit, ..."
+AGGREGATOR_ROUTE_COUNT = 3000
+AGGREGATOR_STOP_COUNT = 20000
+
+
+def is_probable_aggregator(
+    name: str | None, route_count: int | None, stop_count: int | None
+) -> bool:
+    """Flags a row as very likely a regional/national aggregator or
+    multi-operator bundle rather than a single onboardable agency. Heuristic,
+    not certain — flagged rows stay in the data (dashboard/API still show
+    them, labeled) but are excluded from "Top Opportunities" highlights and
+    the ready_to_onboard count, since those are meant to be individually
+    actionable leads. See LOG.md."""
+
+    if name and name.count(",") >= AGGREGATOR_MIN_COMMA_NAMES:
+        return True
+    if (route_count or 0) > AGGREGATOR_ROUTE_COUNT:
+        return True
+    if (stop_count or 0) > AGGREGATOR_STOP_COUNT:
+        return True
+    return False
+
 # Population cache keyed by country_code (fallback: country name), shared
 # across all agencies in a run so we hit World Bank once per country rather
 # than once per agency.
@@ -489,6 +520,10 @@ def run_enrichment() -> int:
                 row.pop("_reachable"),
             )
 
+            row["is_probable_aggregator"] = is_probable_aggregator(
+                row["name"], row["route_count"], row["stop_count"]
+            )
+
         # uncovered_agencies is fully re-derived from mobility_agencies +
         # live feed/population/realtime lookups each run, so it's cleared
         # first — same idempotency reasoning as transit_covered in Step 3.
@@ -501,9 +536,10 @@ def run_enrichment() -> int:
 
     ready_count = sum(1 for r in enriched_rows if r["readiness_status"] == "Ready")
     realtime_count = sum(1 for r in enriched_rows if r["has_realtime"])
+    aggregator_count = sum(1 for r in enriched_rows if r["is_probable_aggregator"])
     logger.info(
-        "Enriched %d agencies: %d Ready, %d with realtime feeds",
-        len(enriched_rows), ready_count, realtime_count,
+        "Enriched %d agencies: %d Ready, %d with realtime feeds, %d flagged as probable aggregators",
+        len(enriched_rows), ready_count, realtime_count, aggregator_count,
     )
 
     return len(enriched_rows)

@@ -66,6 +66,7 @@ class AgencyOut(BaseModel):
     stop_count: Optional[int] = None
     trip_count: Optional[int] = None
     readiness_status: Optional[str] = None
+    is_probable_aggregator: Optional[bool] = None
 
     model_config = {"from_attributes": True}
 
@@ -179,7 +180,16 @@ async def stats():
         ready_to_onboard = await session.scalar(
             select(func.count())
             .select_from(UncoveredAgency)
-            .where(UncoveredAgency.readiness_status == "Ready")
+            .where(
+                UncoveredAgency.readiness_status == "Ready",
+                # Excludes rows flagged as probable regional/national
+                # aggregators (DELFI, BODS, ministries, multi-operator
+                # bundles) — "ready to onboard" is meant to count individual
+                # agencies Transit could actually sign up, not open-data
+                # platforms. See is_probable_aggregator() in
+                # ingestion/enrichment.py and LOG.md.
+                UncoveredAgency.is_probable_aggregator.is_not(True),
+            )
         )
         countries_count = await session.scalar(
             select(func.count(func.distinct(UncoveredAgency.country)))
