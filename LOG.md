@@ -427,3 +427,62 @@ order, repeatably. This is the project's first migration file; every
 earlier schema change went through `Base.metadata.create_all()` on a fresh
 table, which doesn't retrofit existing tables — an explicit migration was
 unavoidable once real data already existed to preserve.
+
+## Post-deploy review pass — bugs found and fixed
+
+Ran a dedicated code-review pass after the opportunity-score rework/dashboard
+rebuild was live. Fixed four real issues (two in `frontend/index.html` found
+directly by re-reading the routing/rank-fetch code myself before the review
+even finished; two in `ingestion/mobility_db.py`, pre-existing since Step 2
+but never caught before real production runs surfaced the second one):
+
+- **`frontend/index.html`**: the "Rank" fetch in the agency detail view had
+  no guard against out-of-order responses — navigating between two agencies
+  quickly could let a slower response for the first one overwrite the rank
+  shown for the second. Fixed with a monotonic request token
+  (`detailRequestToken`).
+- **`frontend/index.html`**: `showView()` was only called on `loadData()`'s
+  success path, so a failed initial load left a `?view=pitch` or
+  `#/agency/id` visitor looking at the dashboard's error state instead of
+  being routed to the view their URL actually asked for. Moved routing
+  outside the try/catch; `renderPitch()` now has its own error state and a
+  bounded 15s timeout on its "wait for data" poll (was unbounded — could
+  spin forever if data never arrived).
+- **`frontend/index.html`**: the table sort comparator's null-handling used
+  an `Infinity`/`-Infinity` sentinel meant to push null values to one end,
+  but for a string column the later type-coercion branch stringified that
+  sentinel to `"infinity"` and sorted it alphabetically as text — so a null
+  value landed wherever `"infinity"` fell alphabetically (between names
+  starting with roughly A-I and J-Z) rather than consistently at the end.
+  Rewrote null-handling as its own branch before any type coercion.
+- **`ingestion/mobility_db.py`**: `upsert_agencies()` committed once after
+  its entire per-record loop, but the except branch called
+  `session.rollback()` on failure — which rolls back the *whole current
+  transaction*, not just the failed statement. One bad record near the end
+  of a run could silently discard every successful insert/update that
+  preceded it in the same session, exactly contradicting the "one bad row
+  must not abort the batch" comment already on that code. Fixed by
+  committing per-record.
+- **`ingestion/mobility_db.py`**: `main()` returned normally (no exception)
+  when it couldn't obtain an access token, which made a missing/expired
+  `MOBILITY_API_TOKEN` look like a successful (empty) Step 2 to `run.py`'s
+  `run_step()` — which only halts the pipeline on an exception — letting
+  Steps 3-5 run against a stale table instead of stopping. Now raises
+  `RuntimeError` instead.
+
+**Reviewed and dismissed as non-issues:**
+- The review flagged `READY_MIN_ROUTES`/`READY_MIN_STOPS` using strict `>`
+  as possibly unintentional given the constants are named "MIN". Checked
+  against the literal brief: "route_count above 5" / "stop_count above 20"
+  — "above" means strict greater-than, matching `quality_score > 70`'s
+  already-documented and boundary-tested treatment of "above 70" the same
+  way. Working as specified, not a bug.
+- The review also flagged `renderPitch()`'s wait loop treating a
+  legitimately-empty (but successfully loaded) `/agencies` response the
+  same as "still loading," polling forever. This exact function had already
+  been rewritten with a bounded 15s timeout during the same session (see
+  above) before the review's result came back — re-checked against the
+  current code and confirmed no longer reproducible; the only residual gap
+  is that the timeout's error message ("timed out") would be slightly
+  misleading in the specific empty-but-not-erroring case, which is cosmetic
+  rather than a functional bug.

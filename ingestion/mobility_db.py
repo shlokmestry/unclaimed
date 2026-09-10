@@ -222,12 +222,21 @@ def upsert_agencies(records: list[dict]) -> int:
                     session.execute(stmt)
                 else:
                     session.add(MobilityAgency(**record))
+                # Committed per-record rather than once at the end of the
+                # loop: session.rollback() in the except branch below rolls
+                # back the *entire* current transaction, not just the
+                # statement that failed. With a single commit at the end, one
+                # bad record near the end of a run would silently discard
+                # every successful insert/update that preceded it in the
+                # same session — exactly what "one bad row must not abort
+                # the batch" is supposed to prevent. Found in a review pass;
+                # see LOG.md.
+                session.commit()
                 written += 1
             except Exception as exc:  # noqa: BLE001 — one bad row must not abort the batch
                 logger.error("Failed to upsert record %r: %s", record.get("source_id"), exc)
                 session.rollback()
                 continue
-        session.commit()
 
     return written
 
@@ -236,8 +245,14 @@ def main() -> None:
     with httpx.Client() as client:
         access_token = get_access_token(client)
         if not access_token:
+            # Raise rather than return — run.py's run_step() only stops the
+            # pipeline on an exception. Returning normally here made a
+            # missing/expired token look like a successful (empty) Step 2 to
+            # run.py, which would then carry on running Steps 3-5 against a
+            # stale mobility_agencies table instead of halting. Found in a
+            # review pass; see LOG.md.
             logger.error("Aborting Mobility Database pull — no access token available.")
-            return
+            raise RuntimeError("Could not obtain a Mobility Database access token")
 
         raw_feeds = fetch_all_feeds(client, access_token)
 
