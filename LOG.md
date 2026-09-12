@@ -49,6 +49,21 @@ count, avg quality, largest market), instead of repeating the same boxed
 card pattern six times. Removed the per-tile colored top stripe entirely —
 it was decorative only, not tied to any actual status or meaning.
 
+Two more passes in the same spirit, aimed at not looking like a generated
+template:
+- The main table repeated a filled green "View Feed" pill on every one of
+  its ~50 rows — a wall of identical bright buttons that drowned out the
+  actual data and is a very recognizable AI-dashboard tell. Rows now get a
+  quiet inline text link ("View feed ↗"); the filled pill stays only in
+  the 5-card Top Opportunities row, where it's one clear call-to-action
+  rather than fifty repeated ones.
+- `.controls` (the filter bar) and `.stats-secondary` (the supporting
+  metrics strip) dropped their box-shadow. Every surface on the page had
+  the same border+shadow+radius treatment regardless of importance;
+  shadow is now reserved for things meant to draw the eye first (the two
+  hero stat cards, the Top Opportunities cards, the table), while
+  structural/utility chrome sits flat.
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume

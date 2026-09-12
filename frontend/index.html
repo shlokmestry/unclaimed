@@ -160,8 +160,7 @@ default. -->
     display: flex;
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
+    border-radius: 12px;
     margin-bottom: 28px;
     overflow: hidden;
   }
@@ -322,6 +321,9 @@ default. -->
   .row-dot.unknown { background: var(--text-muted); }
 
   /* --- Controls --- */
+  /* Flat, not floating — this is filter chrome, not a focal card. Shadow
+     is reserved for things worth looking at first (hero stats, pick
+     cards, the table itself); a filter bar shouldn't compete with them. */
   .controls {
     display: flex;
     align-items: end;
@@ -329,10 +331,9 @@ default. -->
     flex-wrap: wrap;
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 16px 20px;
     margin-bottom: 16px;
-    box-shadow: var(--shadow);
   }
 
   .control-group {
@@ -468,6 +469,27 @@ default. -->
   }
 
   .feed-btn:hover { background: var(--accent-strong); color: #0f1014; }
+
+  /* A filled pill reads fine as one clear call-to-action inside a card
+     (5 of them, in .pick-card) — repeated down every row of a 50-row table
+     it turns into a wall of green and drowns out the data. Table rows get
+     a quiet text link instead; the row itself is already a click target. */
+  .feed-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .feed-link:hover { text-decoration: underline; }
+  .feed-link svg { flex-shrink: 0; opacity: 0.85; }
 
   .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
   .state-row.error { color: var(--critical); }
@@ -1153,7 +1175,9 @@ default. -->
           <td class="num">${a.opportunity_score ?? "—"}</td>
           <td>${
             a.feed_url
-              ? `<button class="feed-btn" data-feed-url="${escapeHtml(a.feed_url)}">View Feed</button>`
+              ? `<button class="feed-link" data-feed-url="${escapeHtml(a.feed_url)}">View feed
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17 17 7M7 7h10v10"/></svg>
+                </button>`
               : "—"
           }</td>
         </tr>`)
@@ -1444,7 +1468,7 @@ default. -->
     // detail view; "View Feed" buttons (in a row or a pick card) open the
     // raw feed directly and must not also trigger row navigation.
     tableBody.addEventListener("click", (e) => {
-      const feedBtn = e.target.closest(".feed-btn");
+      const feedBtn = e.target.closest(".feed-link");
       if (feedBtn && feedBtn.dataset.feedUrl) {
         window.open(feedBtn.dataset.feedUrl, "_blank", "noopener");
         return;
