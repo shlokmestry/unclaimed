@@ -2,6 +2,83 @@
 
 Decisions made during the build that weren't explicitly specified in the brief.
 
+## Third redesign pass ("V3" — Linear/Vercel/Stripe/Raycast/Arc brief)
+
+A third-round brief asked to push further on the same theme (eliminate
+remaining "AI dashboard" tells) with a very specific, large spec. Concrete,
+feasible changes made:
+
+- **Exact background hex values** from the brief adopted directly
+  (`#05070B`/`#0B0F16`/`#11161F`/`#161D28`) — a real layered-charcoal scale
+  rather than the previous slightly-different dark grays.
+- **Further green reduction** (brief: "reduce green usage by 60%, only
+  emerald for primary CTA + success"): opportunity scores (table, pick
+  cards, pitch view) changed from emerald to plain white/text-primary —
+  "numbers should feel editorial," not colored for no reason. Added a
+  `--slate` ("slate blue") token for *interactive links specifically*
+  (global `a:hover`, `.btn-text`, `.pitch-link`, the table's feed-link
+  hover, the back-link) so links stop being emerald by default — emerald
+  is now reserved for the primary button, the "Ready" badge, and the
+  quality ring/histogram (all genuinely success/primary-action contexts).
+  Chip active-state changed from an emerald fill to a neutral "muted
+  glass" (surface + brighter border), per the brief's explicit
+  instruction on selected filter chips. The sort-arrow glyph in table
+  headers is now neutral instead of a standing accent.
+- **Slider redesigned**: custom thin track + small thumb (native
+  `accent-color` removed), with the filled portion computed in JS
+  (`updateSliderFill()`) as a two-stop gradient rather than relying on
+  the browser's default green slider fill.
+- **Feed quality ring**: a small conic-gradient donut (`qualityRing()`)
+  replacing the flat "61" text, used in the featured card and the agency
+  detail page's Feed Health card.
+- **Country flags**: an offline country-name -> ISO-3166 alpha-2 lookup
+  (`COUNTRY_ISO2`, mirroring the same idea as `ingestion/geo.py`
+  server-side, kept separate since this is a standalone static file) —
+  covers the countries that actually show up in Mobility Database data;
+  an unmapped name renders no flag rather than a wrong one. Wired into
+  the table, Top Opportunities cards, the featured card, and the agency
+  detail page.
+- **Monogram avatars** (`agencyAvatar()`): a deterministic per-name-hue
+  initial-letter avatar, since there's no logo data anywhere in this
+  pipeline — the same category of placeholder GitHub/Linear use for
+  entities with no real image, not a fabricated image.
+- **⌘K command hint**: a real keyboard shortcut (`Cmd/Ctrl+K` focuses and
+  selects the search field), not just a decorative `<kbd>` badge next to
+  a search-icon-equipped input.
+- **Realtime pulse**: a small animated cyan ping on the "With realtime
+  feeds" metric tile — the one place a "dot" is honest, since realtime
+  is definitionally live (contrast with round 2, which removed dots that
+  were pure decoration).
+- **Agency detail page elevation** ("feels too empty / like a settings
+  page" in the brief): added a monogram-avatar header row, a rank chip
+  next to the readiness badge, an **Insight card** with a single
+  recommendation sentence built entirely from the agency's own real
+  fields (`buildInsight()` — readiness_status, quality_score,
+  has_realtime, missing_files; describes what the backend already
+  computed, in prose, rather than inventing a new signal), and a
+  3-tile GTFS summary (routes/stops/trips) replacing three plain
+  key/value rows.
+
+Explicitly not implemented, and why (same reasoning as rounds 1-2, still
+holds):
+- **Mapbox / dark map with markers** — needs a Mapbox access token this
+  project doesn't have, plus tile-server network access this sandbox
+  can't reach anyway. Still a real, standalone follow-up once a token
+  exists.
+- **A fabricated multi-event "feed update timeline"** — the pipeline only
+  ever captures one real timestamp per feed (`feed_last_updated`).
+  Inventing a history of prior updates would be fabricated data, not a
+  design improvement, so the single real data point stays presented as
+  one line rather than a fake timeline.
+- **A small service-area map on the detail page** — same Mapbox
+  dependency as above.
+- **React/Tailwind/Framer Motion/Lucide as actual dependencies** — same
+  reasoning as rounds 1-2: this is still a single static `index.html`
+  with no build step, and the visual/motion result the briefs ask for is
+  achievable with plain CSS transitions and hand-drawn inline SVGs
+  without taking on a build pipeline for a project that doesn't
+  otherwise need one.
+
 ## Post-deploy fix — intermittent "Failed to fetch" / 500s on /agencies and /stats
 
 Reported as the live dashboard sometimes failing to load. Vercel runtime

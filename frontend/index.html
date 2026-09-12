@@ -31,14 +31,13 @@ default. -->
   :root {
     color-scheme: dark;
 
-    /* Layered dark surfaces — each step is a genuine elevation, not just a
-       darker gray: a faint warm-neutral lift plus a slightly brighter
-       border, so depth reads from contrast rather than from shadow alone. */
-    --plane:          #0a0b0d;
-    --surface-1:      #16171a;
-    --surface-2:      #1e2023;
-    --surface-3:      #26282c;
-    --surface-hover:  #2a2d31;
+    /* Layered charcoal, not flat gray-900 — each step is a genuine
+       elevation, so depth reads from contrast rather than from shadow. */
+    --plane:          #05070b;
+    --surface-1:      #0b0f16;
+    --surface-2:      #11161f;
+    --surface-3:      #161d28;
+    --surface-hover:  #1b2330;
 
     /* Text hierarchy via opacity on one base color, not three unrelated
        grays — this is what actually makes a page's type feel like one
@@ -79,9 +78,14 @@ default. -->
     --red-wash:       rgba(248,113,113,0.11);
     --red-border:     rgba(248,113,113,0.3);
 
-    --blue:           #60a5fa;
-    --blue-wash:      rgba(96,165,250,0.11);
-    --blue-border:    rgba(96,165,250,0.3);
+    /* "Slate blue" — interactive links only. Kept muted rather than a
+       stock Tailwind sky-blue so it reads as a deliberate pick. */
+    --slate:          #8b9fee;
+    --slate-wash:     rgba(139,159,238,0.11);
+    --slate-border:   rgba(139,159,238,0.3);
+    --blue:           var(--slate);
+    --blue-wash:      var(--slate-wash);
+    --blue-border:    var(--slate-border);
 
     /* Back-compat aliases — the rest of the stylesheet (table, badges,
        detail view) was written against these names; keep them pointed at
@@ -207,7 +211,7 @@ default. -->
   .btn-text {
     background: none;
     padding: 0;
-    color: var(--emerald-strong);
+    color: var(--slate);
     font-weight: 600;
   }
   .btn-text .arrow { display: inline-block; transition: transform var(--dur-fast) var(--ease); }
@@ -228,7 +232,7 @@ default. -->
      a persistent call-to-action gets its own explicit color instead
      (.btn-text, .pitch-link, .feed-link). */
   a { color: var(--text-secondary); text-decoration-color: transparent; transition: color var(--dur-fast) var(--ease), text-decoration-color var(--dur-fast) var(--ease); }
-  a:hover { color: var(--emerald-strong); text-decoration-color: currentColor; }
+  a:hover { color: var(--slate); text-decoration-color: currentColor; }
 
   [hidden] { display: none !important; }
 
@@ -363,17 +367,30 @@ default. -->
     margin-bottom: var(--sp-3);
   }
 
+  .featured-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: var(--sp-4);
+  }
+
   .featured-name {
     font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.01em;
     margin: 0 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .featured-place {
     font-size: 14px;
     color: var(--text-muted);
-    margin: 0 0 var(--sp-4);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .featured-metrics {
@@ -396,6 +413,66 @@ default. -->
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     margin: 0;
+  }
+
+  /* Quality ring: a small conic-gradient donut instead of a bare number —
+     used in the featured card and the agency detail page. The ring's own
+     punch-out color (surface-2) makes it a self-contained component that
+     doesn't need to match whatever surface it's dropped onto exactly. */
+  .quality-ring {
+    --pct: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: conic-gradient(var(--emerald) calc(var(--pct) * 1%), var(--surface-3) 0);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .quality-ring::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--surface-2);
+  }
+
+  .quality-ring .qr-value {
+    position: relative;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+
+  .quality-ring.lg { width: 56px; height: 56px; }
+  .quality-ring.lg .qr-value { font-size: 15px; }
+
+  /* Monogram avatar — deterministic per-name hue kept low-saturation/dark
+     so it reads as identity, not as another bright accent color. */
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: hsl(var(--hue) 35% 18%);
+    color: hsl(var(--hue) 55% 78%);
+    border: 1px solid hsl(var(--hue) 35% 28%);
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .avatar.lg {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    font-size: 20px;
   }
 
   .featured-card .btn { margin-top: auto; align-self: flex-start; }
@@ -453,6 +530,34 @@ default. -->
 
   .metric-tile .mt-label { font-size: 13px; color: var(--text-muted); margin: 0; }
 
+  /* A small live pulse, not a decorative dot — this is the one tile
+     where a dot is honest (realtime feeds are, definitionally, live). */
+  .pulse-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cyan);
+  }
+
+  .pulse-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--cyan);
+    animation: pulse-ring 1.8s var(--ease) infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-dot::after { animation: none; display: none; }
+  }
+
   .quality-hist {
     display: flex;
     align-items: flex-end;
@@ -488,10 +593,10 @@ default. -->
   .section-heading a.pitch-link {
     font-size: 13px;
     font-weight: 600;
-    color: var(--emerald-strong);
+    color: var(--slate);
     text-decoration: none;
   }
-  .section-heading a.pitch-link:hover { color: var(--emerald-strong); text-decoration: underline; }
+  .section-heading a.pitch-link:hover { color: var(--slate); text-decoration: underline; }
 
   .top-picks {
     display: grid;
@@ -521,6 +626,14 @@ default. -->
     filter: brightness(1.06);
   }
 
+  .pick-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+
   .pick-card .pick-name {
     font-size: 14px;
     font-weight: 700;
@@ -533,7 +646,10 @@ default. -->
   .pick-card .pick-place {
     font-size: 12px;
     color: var(--text-muted);
-    margin: 0 0 10px;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .pick-card .pick-foot {
@@ -545,7 +661,7 @@ default. -->
   .pick-card .pick-score {
     font-size: 20px;
     font-weight: 800;
-    color: var(--accent);
+    color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
 
@@ -611,9 +727,9 @@ default. -->
   .chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
   .chip.active {
-    background: var(--emerald-wash);
-    border-color: var(--emerald);
-    color: var(--emerald-strong);
+    background: var(--surface-3);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
   }
 
   .control-group {
@@ -630,6 +746,29 @@ default. -->
 
   .search-group { flex: 1 1 200px; min-width: 170px; }
 
+  .search-wrap { position: relative; display: flex; align-items: center; }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .kbd-hint {
+    position: absolute;
+    right: 8px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+    pointer-events: none;
+  }
+
   input[type="search"], select {
     font: inherit;
     font-size: 14px;
@@ -640,7 +779,7 @@ default. -->
     color: var(--text-primary);
   }
 
-  input[type="search"] { width: 100%; }
+  input[type="search"] { width: 100%; padding-left: 34px; padding-right: 44px; }
   select { min-width: 160px; }
 
   input[type="search"]:focus, select:focus {
@@ -648,7 +787,43 @@ default. -->
     outline-offset: 1px;
   }
 
-  input[type="range"] { accent-color: var(--accent-fill); }
+  /* Custom thin track + small thumb — the native browser slider (with
+     accent-color) renders as a thick, bright-green bar; this is
+     hand-styled instead, with the filled portion set dynamically via JS
+     (updateSliderFill()) as a two-stop gradient rather than the browser
+     default. */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--surface-3);
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--emerald);
+    border: 2px solid var(--plane);
+    box-shadow: 0 0 0 1px var(--emerald-border);
+    cursor: pointer;
+  }
+
+  input[type="range"]::-moz-range-track { background: transparent; height: 4px; }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--emerald);
+    border: 2px solid var(--plane);
+    box-shadow: 0 0 0 1px var(--emerald-border);
+    cursor: pointer;
+  }
+
+  input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--emerald-wash); }
 
   .slider-row { display: flex; align-items: center; gap: 10px; }
   .slider-row input[type="range"] { width: 150px; }
@@ -702,7 +877,7 @@ default. -->
 
   thead th:hover { color: var(--text-primary); }
 
-  thead th .arrow { margin-left: 4px; color: var(--accent); display: inline-block; width: 10px; }
+  thead th .arrow { margin-left: 4px; color: var(--text-secondary); display: inline-block; width: 10px; }
 
   tbody tr {
     cursor: pointer;
@@ -728,7 +903,7 @@ default. -->
   tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 0 var(--emerald); }
   tbody tr:hover .feed-link svg { opacity: 0.85; transform: translate(0, 0); }
 
-  td.name-cell { display: flex; align-items: center; }
+  td.name-cell { display: flex; align-items: center; gap: 10px; }
 
   td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
 
@@ -764,7 +939,7 @@ default. -->
     transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
   }
 
-  tbody tr:hover .feed-link { color: var(--emerald-strong); }
+  tbody tr:hover .feed-link { color: var(--slate); }
 
   .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
   .state-row.error { color: var(--critical); }
@@ -828,23 +1003,118 @@ default. -->
     margin-bottom: 20px;
   }
 
-  .back-link:hover { color: var(--accent); }
+  .back-link:hover { color: var(--slate); }
 
   .detail-header {
-    margin-bottom: 28px;
+    margin-bottom: 20px;
+  }
+
+  .detail-head-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
   }
 
   .detail-header h1 {
     font-size: 32px;
     font-weight: 800;
     letter-spacing: -0.01em;
-    margin: 0 0 8px;
+    margin: 0 0 4px;
   }
 
   .detail-header .place {
     font-size: 15px;
     color: var(--text-secondary);
-    margin: 0 0 12px;
+    margin: 0;
+  }
+
+  .detail-badges { display: flex; align-items: center; gap: 8px; }
+
+  .rank-chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: var(--radius-badge);
+    background: var(--purple-wash);
+    border: 1px solid var(--purple-border);
+    color: var(--purple);
+  }
+
+  /* --- Insight card: a single, data-derived recommendation sentence
+     (built from this agency's own readiness/quality/realtime fields —
+     see buildInsight()), not a generic illustration. --- */
+  .insight-card {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: linear-gradient(160deg, var(--surface-2) 0%, var(--surface-1) 70%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: 20px;
+  }
+
+  .insight-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    background: var(--purple-wash);
+    color: var(--purple);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .insight-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 4px;
+  }
+
+  .insight-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* --- GTFS summary: three compact tiles instead of plain key/value
+     rows, matching the metric-tile visual language used elsewhere. --- */
+  .gtfs-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+  }
+
+  .gtfs-tile {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .gtfs-value {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin: 0;
+  }
+
+  .gtfs-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 2px 0 0;
   }
 
   .detail-grid {
@@ -940,7 +1210,7 @@ default. -->
     text-align: center;
   }
 
-  .pitch-number .n { font-size: 36px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+  .pitch-number .n { font-size: 36px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
   .pitch-number .l { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
 
   .pitch-context {
@@ -1024,8 +1294,13 @@ default. -->
       </div>
       <div class="featured-card" id="featured-card">
         <div class="featured-eyebrow">★ Featured opportunity</div>
-        <p class="featured-name" id="featured-name">—</p>
-        <p class="featured-place" id="featured-place">—</p>
+        <div class="featured-head">
+          <span id="featured-avatar"></span>
+          <div style="min-width:0;">
+            <p class="featured-name" id="featured-name">—</p>
+            <p class="featured-place" id="featured-place">—</p>
+          </div>
+        </div>
         <div class="featured-metrics">
           <div class="featured-metric">
             <p class="fm-label">Population</p>
@@ -1062,6 +1337,7 @@ default. -->
       <div class="metric-tile cyan">
         <div class="mt-top">
           <span class="mt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
+          <span class="pulse-dot" aria-hidden="true"></span>
         </div>
         <p class="mt-value" id="stat-realtime">—</p>
         <p class="mt-label">With realtime feeds</p>
@@ -1085,7 +1361,11 @@ default. -->
     <section class="controls">
       <div class="control-group search-group">
         <label for="search-input">Search</label>
-        <input type="search" id="search-input" placeholder="Agency or city name…" />
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" id="search-input" placeholder="Agency or city name…" />
+          <kbd class="kbd-hint">⌘K</kbd>
+        </div>
       </div>
 
       <div class="control-group">
@@ -1162,18 +1442,49 @@ default. -->
     <button class="back-link" id="back-btn" type="button">← Back to all agencies</button>
 
     <div class="detail-header">
-      <h1 id="detail-name">—</h1>
-      <p class="place" id="detail-place">—</p>
-      <span class="badge" id="detail-badge"></span>
+      <div class="detail-head-row">
+        <span id="detail-avatar"></span>
+        <div style="min-width:0;">
+          <h1 id="detail-name">—</h1>
+          <p class="place" id="detail-place">—</p>
+        </div>
+      </div>
+      <div class="detail-badges">
+        <span class="badge" id="detail-badge"></span>
+        <span class="rank-chip" id="detail-rank-chip" hidden></span>
+      </div>
+    </div>
+
+    <div class="insight-card" id="detail-insight-card">
+      <span class="insight-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 14.5 9H21l-5 4 2 7-6-4.2L6 20l2-7-5-4h6.5Z"/></svg>
+      </span>
+      <div>
+        <p class="insight-label">Insight</p>
+        <p class="insight-text" id="detail-insight">—</p>
+      </div>
     </div>
 
     <div class="detail-grid">
       <div class="detail-card">
         <h3>Feed health</h3>
+
+        <div class="gtfs-summary">
+          <div class="gtfs-tile">
+            <p class="gtfs-value" id="detail-routes">—</p>
+            <p class="gtfs-label">Routes</p>
+          </div>
+          <div class="gtfs-tile">
+            <p class="gtfs-value" id="detail-stops">—</p>
+            <p class="gtfs-label">Stops</p>
+          </div>
+          <div class="gtfs-tile">
+            <p class="gtfs-value" id="detail-trips">—</p>
+            <p class="gtfs-label">Trips</p>
+          </div>
+        </div>
+
         <div class="kv-row"><span class="k">Last updated</span><span class="v" id="detail-updated">—</span></div>
-        <div class="kv-row"><span class="k">Routes</span><span class="v" id="detail-routes">—</span></div>
-        <div class="kv-row"><span class="k">Stops</span><span class="v" id="detail-stops">—</span></div>
-        <div class="kv-row"><span class="k">Trips</span><span class="v" id="detail-trips">—</span></div>
         <div class="kv-row"><span class="k">Realtime feed</span><span class="v" id="detail-realtime">—</span></div>
         <div class="kv-row"><span class="k">Quality score</span><span class="v" id="detail-quality">—</span></div>
         <div class="missing-files" id="detail-missing" hidden></div>
@@ -1285,6 +1596,41 @@ default. -->
       return new Intl.NumberFormat("en-US").format(n);
     }
 
+    // Offline country-name -> ISO 3166-1 alpha-2 lookup, covering the
+    // countries that actually show up in Mobility Database feed data
+    // (mirrors the same idea as ingestion/geo.py server-side, kept
+    // separate since this is a standalone static file with no shared
+    // import). A flag emoji is just two Unicode regional-indicator
+    // symbols encoding those two letters. An unmapped country name
+    // renders no flag rather than a wrong one.
+    const COUNTRY_ISO2 = {
+      "united states": "US", "united states of america": "US", "usa": "US",
+      "canada": "CA", "mexico": "MX", "brazil": "BR", "argentina": "AR",
+      "chile": "CL", "colombia": "CO", "peru": "PE", "uruguay": "UY",
+      "united kingdom": "GB", "ireland": "IE", "france": "FR", "germany": "DE",
+      "spain": "ES", "portugal": "PT", "italy": "IT", "netherlands": "NL",
+      "belgium": "BE", "switzerland": "CH", "austria": "AT", "poland": "PL",
+      "czechia": "CZ", "czech republic": "CZ", "slovakia": "SK", "hungary": "HU",
+      "romania": "RO", "bulgaria": "BG", "greece": "GR", "sweden": "SE",
+      "norway": "NO", "denmark": "DK", "finland": "FI", "iceland": "IS",
+      "estonia": "EE", "latvia": "LV", "lithuania": "LT", "ukraine": "UA",
+      "croatia": "HR", "slovenia": "SI", "serbia": "RS", "luxembourg": "LU",
+      "australia": "AU", "new zealand": "NZ", "japan": "JP", "south korea": "KR",
+      "korea, republic of": "KR", "china": "CN", "india": "IN", "singapore": "SG",
+      "malaysia": "MY", "indonesia": "ID", "philippines": "PH", "thailand": "TH",
+      "vietnam": "VN", "taiwan": "TW", "israel": "IL", "turkey": "TR",
+      "south africa": "ZA", "nigeria": "NG", "kenya": "KE", "egypt": "EG",
+      "morocco": "MA",
+    };
+
+    function countryFlag(countryName) {
+      if (!countryName) return "";
+      const code = COUNTRY_ISO2[countryName.trim().toLowerCase()];
+      if (!code) return "";
+      const OFFSET = 0x1f1e6 - 65; // 'A'
+      return String.fromCodePoint(...[...code.toUpperCase()].map((c) => c.codePointAt(0) + OFFSET));
+    }
+
     // Agency fields (name, country, municipality, feed_url) come from GTFS
     // feed metadata pulled from external, unsanitized sources — escape before
     // interpolating into innerHTML so a crafted feed name/URL can't inject
@@ -1299,6 +1645,19 @@ default. -->
         .replace(/'/g, "&#39;");
     }
 
+    // A monogram avatar (first letter, deterministic hue from the name) —
+    // there's no logo data in this pipeline, so this is a real placeholder
+    // pattern (same idea as GitHub/Linear's default avatars) rather than a
+    // decorative filler image.
+    function agencyAvatar(name, size) {
+      const label = (name || "?").trim().charAt(0).toUpperCase() || "?";
+      let hash = 0;
+      for (let i = 0; i < (name || "").length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+      const hue = Math.abs(hash) % 360;
+      const sizeClass = size === "lg" ? " lg" : "";
+      return `<span class="avatar${sizeClass}" style="--hue:${hue}">${escapeHtml(label)}</span>`;
+    }
+
     function readinessSlug(status) {
       if (status === "Ready") return "ready";
       if (status === "Needs Work") return "needs-work";
@@ -1310,6 +1669,14 @@ default. -->
       const slug = readinessSlug(status);
       const label = status || "Unknown";
       return `<span class="badge ${slug}">${escapeHtml(label)}</span>`;
+    }
+
+    function qualityRing(score, size) {
+      const hasScore = score !== null && score !== undefined && !Number.isNaN(score);
+      const pct = hasScore ? Math.max(0, Math.min(100, score)) : 0;
+      const label = hasScore ? Math.round(score) : "—";
+      const sizeClass = size === "lg" ? " lg" : "";
+      return `<span class="quality-ring${sizeClass}" style="--pct:${pct}"><span class="qr-value">${label}</span></span>`;
     }
 
     // Updates an existing badge element in place (className + content)
@@ -1437,8 +1804,13 @@ default. -->
         .map(
           (a) => `
         <div class="pick-card" data-id="${a.id}">
-          <p class="pick-name">${escapeHtml(a.name) || "—"}</p>
-          <p class="pick-place">${escapeHtml(a.municipality) ? escapeHtml(a.municipality) + ", " : ""}${escapeHtml(a.country) || "—"}</p>
+          <div class="pick-head">
+            ${agencyAvatar(a.name)}
+            <div style="min-width:0; flex:1;">
+              <p class="pick-name">${escapeHtml(a.name) || "—"}</p>
+              <p class="pick-place">${countryFlag(a.country) ? countryFlag(a.country) + " " : ""}${escapeHtml(a.municipality) ? escapeHtml(a.municipality) + ", " : ""}${escapeHtml(a.country) || "—"}</p>
+            </div>
+          </div>
           ${readinessBadge(a.readiness_status)}
           <div class="pick-foot" style="margin-top:10px;">
             <span class="pick-score">${a.opportunity_score ?? "—"}</span>
@@ -1467,8 +1839,8 @@ default. -->
       tableBody.innerHTML = pageRows
         .map((a) => `
         <tr data-id="${a.id}">
-          <td class="name-cell">${escapeHtml(a.name) || "—"}</td>
-          <td>${escapeHtml(a.country) || "—"}</td>
+          <td class="name-cell">${agencyAvatar(a.name)}${escapeHtml(a.name) || "—"}</td>
+          <td>${countryFlag(a.country) ? countryFlag(a.country) + " " : ""}${escapeHtml(a.country) || "—"}</td>
           <td>${escapeHtml(a.municipality) || "—"}</td>
           <td class="num">${numberFormat(a.population)}</td>
           <td class="num">${a.quality_score ?? "—"}</td>
@@ -1572,12 +1944,12 @@ default. -->
 
       if (!top) return;
 
+      document.getElementById("featured-avatar").innerHTML = agencyAvatar(top.name);
       document.getElementById("featured-name").textContent = top.name || "—";
-      document.getElementById("featured-place").textContent =
-        [top.municipality, top.country].filter(Boolean).join(", ") || "—";
+      document.getElementById("featured-place").innerHTML =
+        `${countryFlag(top.country) ? countryFlag(top.country) + " " : ""}${escapeHtml([top.municipality, top.country].filter(Boolean).join(", ")) || "—"}`;
       document.getElementById("featured-population").textContent = numberFormat(top.population);
-      document.getElementById("featured-quality").textContent =
-        top.quality_score !== null && top.quality_score !== undefined ? top.quality_score : "—";
+      document.getElementById("featured-quality").innerHTML = qualityRing(top.quality_score);
       document.getElementById("featured-realtime").textContent = top.has_realtime ? "Yes" : "No";
       document.getElementById("featured-cta").onclick = () => goToAgency(top.id);
     }
@@ -1625,12 +1997,39 @@ default. -->
 
     // ---------- agency detail view ----------
 
+    // A single, honest recommendation sentence built entirely from this
+    // agency's own real fields (readiness_status, quality_score,
+    // has_realtime, missing_files) -- describes what's already computed
+    // server-side, in prose, rather than inventing new signals.
+    function buildInsight(agency) {
+      const pop = agency.population ? numberFormat(agency.population) : null;
+      const realtimeClause = agency.has_realtime ? "realtime data available" : "no realtime feed yet";
+
+      if (agency.readiness_status === "Ready") {
+        return `Clean, recently-updated GTFS feed${pop ? ` serving a population of ${pop}` : ""}, with ${realtimeClause}. This agency looks immediately ready for onboarding.`;
+      }
+      if (agency.readiness_status === "Dead Feed") {
+        return "This feed hasn't been refreshed in a long time (or couldn't be read) -- verify it's still active before reaching out.";
+      }
+      if (agency.readiness_status === "Needs Work") {
+        if (agency.missing_files && agency.missing_files.length) {
+          return `The feed is missing ${agency.missing_files.join(", ")} -- worth a quick check with the agency before pitching this as onboard-ready.`;
+        }
+        return `Feed quality or freshness is borderline${pop ? ` for a market of ${pop}` : ""} -- likely still onboardable, but worth a closer look first.`;
+      }
+      return "Not enough signal yet to assess this feed's readiness.";
+    }
+
     async function renderDetail(id) {
       const requestToken = ++detailRequestToken;
 
       const badgeEl = document.getElementById("detail-badge");
       document.getElementById("detail-name").textContent = "Loading…";
       document.getElementById("detail-place").textContent = "";
+      document.getElementById("detail-avatar").innerHTML = "";
+      document.getElementById("detail-insight").textContent = "—";
+      const rankChipEl = document.getElementById("detail-rank-chip");
+      rankChipEl.hidden = true;
       badgeEl.className = "badge";
       badgeEl.innerHTML = "";
 
@@ -1642,18 +2041,19 @@ default. -->
           agency = await resp.json();
         }
 
+        document.getElementById("detail-avatar").innerHTML = agencyAvatar(agency.name, "lg");
         document.getElementById("detail-name").textContent = agency.name || "—";
-        document.getElementById("detail-place").textContent =
-          [agency.municipality, agency.country].filter(Boolean).join(", ") || "—";
+        document.getElementById("detail-place").innerHTML =
+          `${countryFlag(agency.country) ? countryFlag(agency.country) + " " : ""}${escapeHtml([agency.municipality, agency.country].filter(Boolean).join(", ")) || "—"}`;
         setReadinessBadge(badgeEl, agency.readiness_status);
+        document.getElementById("detail-insight").textContent = buildInsight(agency);
 
         document.getElementById("detail-updated").textContent = formatDate(agency.feed_last_updated);
         document.getElementById("detail-routes").textContent = numberFormat(agency.route_count);
         document.getElementById("detail-stops").textContent = numberFormat(agency.stop_count);
         document.getElementById("detail-trips").textContent = numberFormat(agency.trip_count);
         document.getElementById("detail-realtime").textContent = agency.has_realtime ? "Yes" : "No";
-        document.getElementById("detail-quality").textContent =
-          agency.quality_score !== null && agency.quality_score !== undefined ? `${agency.quality_score} / 100` : "—";
+        document.getElementById("detail-quality").innerHTML = qualityRing(agency.quality_score, "lg");
 
         const missingEl = document.getElementById("detail-missing");
         if (agency.missing_files && agency.missing_files.length) {
@@ -1676,9 +2076,13 @@ default. -->
             // agency since this fetch started — otherwise a slower response
             // for a previous agency can overwrite the current one's rank.
             if (requestToken !== detailRequestToken) return;
-            rankEl.textContent = data && data.rank
-              ? `#${numberFormat(data.rank)} of ${numberFormat(data.total)}`
-              : "—";
+            if (data && data.rank) {
+              rankEl.textContent = `#${numberFormat(data.rank)} of ${numberFormat(data.total)}`;
+              rankChipEl.textContent = `#${numberFormat(data.rank)} opportunity`;
+              rankChipEl.hidden = false;
+            } else {
+              rankEl.textContent = "—";
+            }
           })
           .catch(() => {
             if (requestToken !== detailRequestToken) return;
@@ -1776,7 +2180,7 @@ default. -->
         <tr>
           <td>${i + 1}</td>
           <td>${escapeHtml(a.name) || "—"}</td>
-          <td>${escapeHtml(a.country) || "—"}</td>
+          <td>${countryFlag(a.country) ? countryFlag(a.country) + " " : ""}${escapeHtml(a.country) || "—"}</td>
           <td>${escapeHtml(a.municipality) || "—"}</td>
           <td>${a.has_realtime ? "Yes" : "No"}</td>
           <td>${escapeHtml(a.readiness_status) || "Unknown"}</td>
@@ -1819,11 +2223,19 @@ default. -->
       renderTable();
     });
 
+    function updateSliderFill() {
+      const pct = (qualitySlider.value / qualitySlider.max) * 100;
+      qualitySlider.style.background =
+        `linear-gradient(90deg, var(--emerald) 0%, var(--emerald) ${pct}%, var(--surface-3) ${pct}%, var(--surface-3) 100%)`;
+    }
+
     qualitySlider.addEventListener("input", () => {
       qualitySliderValue.textContent = qualitySlider.value;
+      updateSliderFill();
       currentPage = 1;
       renderTable();
     });
+    updateSliderFill();
 
     let searchDebounce;
     searchInput.addEventListener("input", () => {
@@ -1836,6 +2248,7 @@ default. -->
       setReadinessChip("");
       qualitySlider.value = 0;
       qualitySliderValue.textContent = "0";
+      updateSliderFill();
       searchInput.value = "";
       sortKey = "opportunity_score";
       sortDir = "desc";
@@ -1867,6 +2280,16 @@ default. -->
       }
       const card = e.target.closest(".pick-card[data-id]");
       if (card) goToAgency(card.dataset.id);
+    });
+
+    // Cmd/Ctrl+K focuses search, matching the ⌘K hint shown in the field —
+    // a real shortcut, not just decoration.
+    window.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
     });
 
     loadData();
