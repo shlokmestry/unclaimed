@@ -24,36 +24,145 @@ default. -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Unclaimed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&display=swap" rel="stylesheet" />
 <style>
   :root {
     color-scheme: dark;
-    --page-plane:     #0f1014;
-    --surface-1:      #18181a;
-    --surface-2:      #232326;
-    --surface-3:      #2f2f33;
-    --text-primary:   #ffffff;
-    --text-secondary: #c6c6ca;
-    --text-muted:     #909098;
-    --gridline:       #3b3b40;
-    --border:         rgba(255,255,255,0.09);
-    --accent:         #6edc91;   /* AA on dark surfaces */
-    --accent-strong:  #d1fbdb;   /* hover/emphasis on dark */
-    --accent-fill:    #27a559;   /* Transit's real brand green */
-    --accent-wash:    #16301f;
+
+    /* Layered dark surfaces — each step is a genuine elevation, not just a
+       darker gray: a faint warm-neutral lift plus a slightly brighter
+       border, so depth reads from contrast rather than from shadow alone. */
+    --plane:          #0a0b0d;
+    --surface-1:      #16171a;
+    --surface-2:      #1e2023;
+    --surface-3:      #26282c;
+    --surface-hover:  #2a2d31;
+
+    --text-primary:   #f5f6f7;
+    --text-secondary: #b4b7bd;
+    --text-muted:     #7a7d84;
+    --gridline:       #2e3034;
+    --border:         rgba(255,255,255,0.08);
+    --border-strong:  rgba(255,255,255,0.16);
+
+    /* Primary: emerald. Secondary accents each carry one meaning and are
+       never used decoratively — cyan only for realtime, amber only for
+       "needs work", purple only for featured markets, red only for dead
+       feeds. */
+    --emerald:        #22c55e;
+    --emerald-strong: #4ade80;
+    --emerald-wash:   rgba(34,197,94,0.12);
+    --cyan:           #22d3ee;
+    --cyan-wash:      rgba(34,211,238,0.12);
+    --amber:          #f5a524;
+    --amber-wash:     rgba(245,165,36,0.12);
+    --purple:         #a78bfa;
+    --purple-wash:    rgba(167,139,250,0.12);
+    --red:            #f87171;
+    --red-wash:       rgba(248,113,113,0.12);
+
+    /* Back-compat aliases — the rest of the stylesheet (table, badges,
+       detail view) was written against these names; keep them pointed at
+       the new palette instead of touching every call site. */
+    --accent:         var(--emerald-strong);
+    --accent-strong:  #bbf7d0;
+    --accent-fill:    var(--emerald);
+    --accent-wash:    var(--emerald-wash);
     --row-alt:        rgba(255,255,255,0.02);
-    --good:           #27a559;
-    --warning:        #ffc247;
-    --critical:       #ff6b57;
-    --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 1px 1px rgba(0,0,0,0.2);
+    --good:           var(--emerald);
+    --warning:        var(--amber);
+    --critical:       var(--red);
+    --page-plane:     var(--plane);
+
+    /* Elevation via contrast + a soft, close shadow — not a floaty drop
+       shadow, just enough to separate a surface from the plane behind it. */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow: var(--shadow-sm);
+
+    /* 8px spacing scale */
+    --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
+    --sp-5: 24px; --sp-6: 32px;  --sp-7: 48px;  --sp-8: 64px;
+
+    --radius-sm: 8px;  --radius-md: 12px;  --radius-lg: 16px;
+
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 120ms;
+    --dur-med: 240ms;
   }
 
   * { box-sizing: border-box; }
 
   body {
-    background: var(--page-plane);
+    background: var(--plane);
     color: var(--text-primary);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "ss01" on;
   }
+
+  /* ---------- Motion: fade + slide on first paint, no framework ---------- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity var(--dur-med) var(--ease), transform var(--dur-med) var(--ease);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ---------- Unified button system (replaces .action-btn/.reset-btn/
+     .page-btn/.feed-btn's separate, slightly-inconsistent declarations) --- */
+  .btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+                color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible {
+    outline: 2px solid var(--emerald-strong);
+    outline-offset: 2px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, var(--emerald-strong), var(--emerald));
+    color: #06240f;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 12px rgba(34,197,94,0.28);
+  }
+  .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 6px 16px rgba(34,197,94,0.36); }
+
+  .btn-ghost {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  .btn-ghost:hover { border-color: var(--border-strong); background: var(--surface-3); }
+
+  .btn-text {
+    background: none;
+    padding: 0;
+    color: var(--emerald-strong);
+    font-weight: 600;
+  }
+  .btn-text .arrow { display: inline-block; transition: transform var(--dur-fast) var(--ease); }
+  .btn-text:hover .arrow { transform: translateX(3px); }
+  .btn-text:hover { text-decoration: underline; }
+
+  .btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
   .wrap {
     max-width: 1180px;
@@ -91,125 +200,194 @@ default. -->
   }
 
   header h1 {
-    font-size: 42px;
-    font-weight: 800;
+    font-size: 32px;
+    font-weight: 700;
     letter-spacing: -0.02em;
-    margin: 0 0 8px;
+    margin: 0;
   }
 
-  header p.tagline {
+  /* --- Hero: split layout. Left carries the headline number at real
+     landing-page scale; right is a single featured opportunity, not a
+     stat card, so the page opens with a story ("here's the biggest one")
+     rather than a wall of metrics. --- */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: var(--sp-6);
+    align-items: stretch;
+    margin: var(--sp-6) 0 var(--sp-7);
+  }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; }
+  }
+
+  .hero-left { display: flex; flex-direction: column; justify-content: center; }
+
+  .hero-number {
+    font-size: clamp(56px, 8vw, 80px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin: var(--sp-3) 0 var(--sp-4);
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, var(--text-primary), var(--text-secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero-desc {
     font-size: 16px;
     color: var(--text-secondary);
-    margin: 0 0 32px;
-    max-width: 640px;
-    line-height: 1.5;
-  }
-
-  header p.tagline .num {
-    color: var(--accent);
-    font-weight: 700;
-  }
-
-  /* --- Stats: two-tier hierarchy — the two numbers that matter most get
-     featured hero cards; the four supporting metrics share one compact
-     strip instead of repeating the same card pattern six identical times. */
-  .stats-hero {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    margin-bottom: 12px;
-  }
-
-  @media (max-width: 640px) {
-    .stats-hero { grid-template-columns: 1fr; }
-  }
-
-  .hero-stat {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 22px 24px;
-    box-shadow: var(--shadow);
-  }
-
-  .hero-stat.accent { border-left: 3px solid var(--accent-fill); }
-
-  .hero-stat .label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin: 0 0 10px;
-  }
-
-  .hero-stat .value {
-    font-size: 40px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    line-height: 1.6;
+    max-width: 480px;
     margin: 0;
-    font-variant-numeric: tabular-nums;
   }
 
-  .hero-stat .hero-sub {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin: 10px 0 0;
-  }
+  .hero-desc strong { color: var(--text-primary); font-weight: 600; }
 
-  .stats-secondary {
-    display: flex;
-    background: var(--surface-1);
+  /* Featured opportunity — the one place purple appears, reserved (per
+     the palette) for "featured market" and nothing else. */
+  .featured-card {
+    background: linear-gradient(160deg, var(--surface-2) 0%, var(--surface-1) 60%);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    margin-bottom: 28px;
+    border-radius: var(--radius-lg);
+    padding: var(--sp-5);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    position: relative;
     overflow: hidden;
   }
 
-  .mini-stat {
-    flex: 1;
-    padding: 16px 20px;
-    border-right: 1px solid var(--border);
+  .featured-card::before {
+    content: "";
+    position: absolute;
+    top: -40%; right: -30%;
+    width: 240px; height: 240px;
+    background: radial-gradient(circle, var(--purple-wash) 0%, transparent 70%);
+    pointer-events: none;
   }
 
-  .mini-stat:last-child { border-right: none; }
-  .mini-stat.wide { flex: 1.6; }
-
-  .mini-stat .mini-label {
+  .featured-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
-    color: var(--text-muted);
-    margin: 0 0 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--purple);
+    margin-bottom: var(--sp-3);
   }
 
-  .mini-stat .mini-value {
+  .featured-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
+  }
+
+  .featured-place {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .featured-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-4);
+  }
+
+  .featured-metric .fm-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 0 0 4px;
+  }
+
+  .featured-metric .fm-value {
     font-size: 20px;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
     margin: 0;
-    letter-spacing: -0.005em;
+  }
+
+  .featured-card .btn { margin-top: auto; align-self: flex-start; }
+
+  /* --- Metric tiles: one shared surface, but each carries its own icon
+     and accent so the row doesn't read as six identical boxes. --- */
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+  }
+
+  @media (max-width: 860px) {
+    .metric-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .metric-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4);
+  }
+
+  .metric-tile .mt-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--sp-3);
+  }
+
+  .metric-tile .mt-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .metric-tile .mt-icon svg { width: 15px; height: 15px; }
+
+  .metric-tile.emerald .mt-icon { background: var(--emerald-wash); color: var(--emerald-strong); }
+  .metric-tile.cyan .mt-icon    { background: var(--cyan-wash); color: var(--cyan); }
+  .metric-tile.amber .mt-icon   { background: var(--amber-wash); color: var(--amber); }
+  .metric-tile.neutral .mt-icon { background: var(--surface-3); color: var(--text-secondary); }
+
+  .metric-tile .mt-value {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 2px;
     font-variant-numeric: tabular-nums;
   }
 
-  .mini-stat .mini-value.text {
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.35;
+  .metric-tile .mt-value.text { font-size: 16px; }
+
+  .metric-tile .mt-label { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+  .quality-hist {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    width: 56px;
+    height: 20px;
+    flex-shrink: 0;
   }
 
-  .mini-stat .mini-value .sub {
+  .quality-hist i {
     display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
-
-  @media (max-width: 720px) {
-    .stats-secondary { flex-wrap: wrap; }
-    .mini-stat {
-      flex: 1 1 50%;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-    }
-    .mini-stat.wide { flex: 1 1 100%; border-bottom: none; }
+    flex: 1 1 0;
+    min-width: 2px;
+    background: var(--emerald);
+    opacity: 0.35;
+    border-radius: 2px 2px 0 0;
   }
 
   /* --- Top Opportunities --- */
@@ -380,21 +558,6 @@ default. -->
     min-width: 26px;
   }
 
-  .reset-btn {
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: 1px solid var(--gridline);
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .reset-btn:hover { border-color: var(--accent-fill); color: var(--accent); }
-
   .result-meta {
     display: flex;
     align-items: center;
@@ -456,19 +619,7 @@ default. -->
 
   td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
 
-  .feed-btn {
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 14px;
-    border-radius: 999px;
-    border: none;
-    background: var(--accent-fill);
-    color: #ffffff;
-    cursor: pointer;
-  }
-
-  .feed-btn:hover { background: var(--accent-strong); color: #0f1014; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
 
   /* A filled pill reads fine as one clear call-to-action inside a card
      (5 of them, in .pick-card) — repeated down every row of a 50-row table
@@ -504,21 +655,6 @@ default. -->
     border-top: 1px solid var(--gridline);
     background: var(--surface-2);
   }
-
-  .page-btn {
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 7px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--gridline);
-    background: var(--surface-1);
-    color: var(--text-primary);
-    cursor: pointer;
-  }
-
-  .page-btn:disabled { opacity: 0.4; cursor: default; }
-  .page-btn:not(:disabled):hover { border-color: var(--accent-fill); color: var(--accent); }
 
   .page-info { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
@@ -635,25 +771,6 @@ default. -->
     margin-top: 6px;
   }
 
-  .action-btn {
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 9px 16px;
-    border-radius: 999px;
-    border: 1px solid var(--gridline);
-    background: var(--surface-2);
-    color: var(--text-primary);
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .action-btn:hover { border-color: var(--accent-fill); color: var(--accent); }
-  .action-btn.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
-  .action-btn.primary:hover { background: var(--accent-strong); color: #0f1014; }
 
   /* --- Pitch view --- */
   .pitch-wrap { max-width: 900px; margin: 0 auto; padding: 48px 24px 60px; }
@@ -748,40 +865,69 @@ default. -->
         <span>Opportunity finder</span>
       </div>
       <h1>Unclaimed</h1>
-      <p class="tagline" id="tagline">
-        <span class="num" id="tagline-count">—</span> transit agencies. Public data. Not yet on Transit app.
-      </p>
     </header>
 
-    <section class="stats-hero">
-      <div class="hero-stat">
-        <p class="label">Total uncovered</p>
-        <p class="value" id="stat-total">—</p>
-        <p class="hero-sub">agencies with public GTFS feeds, not yet on Transit</p>
+    <section class="hero reveal" id="hero">
+      <div class="hero-left">
+        <p class="hero-number" id="stat-total">—</p>
+        <p class="hero-desc">
+          Transit agencies with a public <strong>GTFS feed</strong> that
+          isn't yet covered by Transit app — <span id="stat-ready-inline">—</span>
+          of them are clean and recent enough to onboard today, no cleanup
+          needed.
+        </p>
       </div>
-      <div class="hero-stat accent">
-        <p class="label">Ready to onboard</p>
-        <p class="value" id="stat-ready">—</p>
-        <p class="hero-sub">clean, recently updated feeds — no cleanup needed</p>
+      <div class="featured-card" id="featured-card">
+        <div class="featured-eyebrow">★ Featured opportunity</div>
+        <p class="featured-name" id="featured-name">—</p>
+        <p class="featured-place" id="featured-place">—</p>
+        <div class="featured-metrics">
+          <div class="featured-metric">
+            <p class="fm-label">Population</p>
+            <p class="fm-value" id="featured-population">—</p>
+          </div>
+          <div class="featured-metric">
+            <p class="fm-label">Feed quality</p>
+            <p class="fm-value" id="featured-quality">—</p>
+          </div>
+          <div class="featured-metric">
+            <p class="fm-label">Realtime</p>
+            <p class="fm-value" id="featured-realtime">—</p>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="featured-cta" type="button">View opportunity →</button>
       </div>
     </section>
 
-    <section class="stats-secondary">
-      <div class="mini-stat">
-        <p class="mini-value" id="stat-countries">—</p>
-        <p class="mini-label">Countries not covered</p>
+    <section class="metric-row reveal" id="metric-row">
+      <div class="metric-tile emerald">
+        <div class="mt-top">
+          <span class="mt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        </div>
+        <p class="mt-value" id="stat-ready">—</p>
+        <p class="mt-label">Ready to onboard</p>
       </div>
-      <div class="mini-stat">
-        <p class="mini-value" id="stat-realtime">—</p>
-        <p class="mini-label">With realtime feeds</p>
+      <div class="metric-tile neutral">
+        <div class="mt-top">
+          <span class="mt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z"/></svg></span>
+        </div>
+        <p class="mt-value" id="stat-countries">—</p>
+        <p class="mt-label">Countries not covered</p>
       </div>
-      <div class="mini-stat">
-        <p class="mini-value" id="stat-quality">—</p>
-        <p class="mini-label">Average feed quality</p>
+      <div class="metric-tile cyan">
+        <div class="mt-top">
+          <span class="mt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
+        </div>
+        <p class="mt-value" id="stat-realtime">—</p>
+        <p class="mt-label">With realtime feeds</p>
       </div>
-      <div class="mini-stat wide">
-        <p class="mini-value text" id="stat-largest">—</p>
-        <p class="mini-label">Largest uncovered market</p>
+      <div class="metric-tile amber">
+        <div class="mt-top">
+          <span class="mt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-6 3 3 5-7"/></svg></span>
+          <span class="quality-hist" id="quality-hist"></span>
+        </div>
+        <p class="mt-value" id="stat-quality">—</p>
+        <p class="mt-label">Average feed quality</p>
       </div>
     </section>
 
@@ -822,7 +968,7 @@ default. -->
         </div>
       </div>
 
-      <button class="reset-btn" id="reset-btn" type="button">Reset filters</button>
+      <button class="btn btn-ghost" id="reset-btn" type="button">Reset filters</button>
     </section>
 
     <div class="result-meta" id="result-meta"></div>
@@ -847,9 +993,9 @@ default. -->
         </table>
       </div>
       <div class="pagination" id="pagination" hidden>
-        <button class="page-btn" id="prev-page" type="button">← Prev</button>
+        <button class="btn btn-ghost" id="prev-page" type="button">← Prev</button>
         <span class="page-info" id="page-info"></span>
-        <button class="page-btn" id="next-page" type="button">Next →</button>
+        <button class="btn btn-ghost" id="next-page" type="button">Next →</button>
       </div>
     </section>
 
@@ -893,9 +1039,9 @@ default. -->
     <div class="detail-card">
       <h3>Actions</h3>
       <div class="actions-row">
-        <button class="action-btn primary" id="detail-view-feed">View / download feed</button>
-        <button class="action-btn" id="detail-copy-url">Copy Feed URL</button>
-        <a class="action-btn" id="detail-mdb-link" href="#" target="_blank" rel="noopener">View on Mobility Database</a>
+        <button class="btn btn-primary" id="detail-view-feed">View / download feed</button>
+        <button class="btn btn-ghost" id="detail-copy-url">Copy Feed URL</button>
+        <a class="btn btn-ghost" id="detail-mdb-link" href="#" target="_blank" rel="noopener">View on Mobility Database</a>
       </div>
     </div>
   </div>
@@ -1142,7 +1288,7 @@ default. -->
           ${readinessBadge(a.readiness_status)}
           <div class="pick-foot" style="margin-top:10px;">
             <span class="pick-score">${a.opportunity_score ?? "—"}</span>
-            <button class="feed-btn" data-view-id="${a.id}" type="button">View</button>
+            <button class="btn btn-primary btn-sm" data-view-id="${a.id}" type="button">View</button>
           </div>
         </div>`
         )
@@ -1209,20 +1355,82 @@ default. -->
         countries.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
     }
 
+    // Small hand-written count-up — no animation library. Eases out over
+    // ~800ms; respects prefers-reduced-motion by just snapping to the
+    // final value.
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function animateCountUp(el, target) {
+      if (target === null || target === undefined || Number.isNaN(target)) {
+        el.textContent = "—";
+        return;
+      }
+      if (prefersReducedMotion) {
+        el.textContent = numberFormat(target);
+        return;
+      }
+      const duration = 800;
+      const startTime = performance.now();
+      function tick(now) {
+        const p = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = numberFormat(Math.round(target * eased));
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
     function renderStats(stats) {
-      document.getElementById("stat-total").textContent = numberFormat(stats.total_uncovered);
+      animateCountUp(document.getElementById("stat-total"), stats.total_uncovered);
       document.getElementById("stat-ready").textContent = numberFormat(stats.ready_to_onboard);
+      document.getElementById("stat-ready-inline").textContent = numberFormat(stats.ready_to_onboard);
       document.getElementById("stat-countries").textContent = numberFormat(stats.countries_count);
       document.getElementById("stat-realtime").textContent = numberFormat(stats.realtime_count);
       document.getElementById("stat-quality").textContent =
         stats.avg_quality !== null && stats.avg_quality !== undefined ? stats.avg_quality.toFixed(1) : "—";
+    }
 
-      const lm = stats.largest_market;
-      document.getElementById("stat-largest").innerHTML = lm && lm.name
-        ? `${escapeHtml(lm.name)}<span class="sub">${escapeHtml(lm.country) || ""} · ${numberFormat(lm.population)}</span>`
-        : "—";
+    // Real data, not decoration — a quality-score distribution built from
+    // the agencies actually loaded, bucketed into ten 0-100 bins.
+    function renderQualityHistogram() {
+      const el = document.getElementById("quality-hist");
+      const buckets = new Array(10).fill(0);
+      allAgencies.forEach((a) => {
+        if (a.quality_score === null || a.quality_score === undefined) return;
+        const idx = Math.min(9, Math.max(0, Math.floor(a.quality_score / 10)));
+        buckets[idx] += 1;
+      });
+      const max = Math.max(1, ...buckets);
+      el.innerHTML = buckets
+        .map((c) => `<i style="height:${Math.max(10, Math.round((c / max) * 100))}%"></i>`)
+        .join("");
+    }
 
-      document.getElementById("tagline-count").textContent = numberFormat(stats.total_uncovered);
+    // The single best opportunity (highest opportunity_score, aggregators
+    // excluded per the same rule as Top Opportunities) — the hero's
+    // "featured card" is this one agency, not a repeated stat.
+    function renderFeatured() {
+      const top = allAgencies
+        .filter((a) => !a.is_probable_aggregator)
+        .slice()
+        .sort((a, b) => (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1))[0];
+
+      if (!top) return;
+
+      document.getElementById("featured-name").textContent = top.name || "—";
+      document.getElementById("featured-place").textContent =
+        [top.municipality, top.country].filter(Boolean).join(", ") || "—";
+      document.getElementById("featured-population").textContent = numberFormat(top.population);
+      document.getElementById("featured-quality").textContent =
+        top.quality_score !== null && top.quality_score !== undefined ? top.quality_score : "—";
+      document.getElementById("featured-realtime").textContent = top.has_realtime ? "Yes" : "No";
+      document.getElementById("featured-cta").onclick = () => goToAgency(top.id);
+    }
+
+    function revealSections() {
+      requestAnimationFrame(() => {
+        document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
+      });
     }
 
     async function loadData() {
@@ -1241,6 +1449,8 @@ default. -->
         latestStats = await statsResp.json();
 
         renderStats(latestStats);
+        renderFeatured();
+        renderQualityHistogram();
         populateCountryFilter();
         renderTopPicks();
         renderTable();
@@ -1248,6 +1458,8 @@ default. -->
         loadError = err;
         renderStateRow(`Could not load data from the API (${err.message}).`, true);
       }
+
+      revealSections();
 
       // Route to the correct view regardless of load outcome — otherwise a
       // failed load leaves a `?view=pitch` or `#/agency/id` visitor looking

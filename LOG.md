@@ -64,6 +64,62 @@ template:
   hero stat cards, the Top Opportunities cards, the table), while
   structural/utility chrome sits flat.
 
+## Full redesign pass (Linear/Vercel/Stripe brief)
+
+Requested: rebuild the visual design to feel handcrafted/premium rather
+than a generated Tailwind/shadcn dashboard, per a detailed brief specifying
+Geist typography, an emerald/cyan/amber/purple palette, layered dark
+surfaces, Framer Motion, Lucide icons, Mapbox, sparklines/charts, etc.
+
+Reality check before starting: this app is a single static `index.html`
+(vanilla JS, no build step) talking to a FastAPI backend, deployed as-is.
+The brief assumes a React/Tailwind/TypeScript stack. Introducing all of
+that means a build pipeline and a deploy rewrite (`vercel.json` currently
+serves this file as a static asset) — real architectural risk, and works
+against the brief's own "don't change routing/APIs" rule more than it
+serves it. So the same *design outcome* is delivered inside the existing
+architecture instead:
+- Framer Motion -> CSS transitions + a `.reveal` fade/slide-in class
+  toggled after load, plus a hand-written `requestAnimationFrame` count-up
+  for the hero number. No dependency added.
+- Lucide icons -> hand-drawn inline SVGs in the same 24px/2px-stroke
+  style, inlined directly (no icon-font/JS-bundle fetch).
+- Sparklines -> one real one: a quality-score histogram in the "Average
+  feed quality" metric tile, bucketed from the agencies actually loaded
+  (`renderQualityHistogram()`) — not a fabricated trend line, since there's
+  no time-series data to chart honestly.
+- Mapbox map -> explicitly skipped. It needs a Mapbox access token (a
+  secret only the project owner has) and tile-server network access;
+  flagged as a real follow-up rather than faked with placeholder markers.
+- Geist -> now loaded via Google Fonts (`family=Geist:wght@400..800`),
+  with the previous system-font stack kept as the fallback chain.
+
+Design tokens added (`:root`): layered surface levels (`--surface-1..3`,
+`--surface-hover`) distinct from the page plane, a real 8px spacing scale
+(`--sp-1..8`), two shadow tiers (`--shadow-sm`/`--shadow-md`, elevation now
+means something instead of being applied uniformly), and the requested
+accent set — emerald primary, cyan/amber/purple *each carrying exactly one
+meaning* (realtime / needs-work / featured-market) rather than being used
+decoratively. Old token names (`--accent`, `--accent-fill`, etc.) are kept
+as aliases onto the new palette so the rest of the stylesheet didn't need
+touching everywhere at once.
+
+Unified button system (`.btn` + `.btn-primary`/`.btn-ghost`/`.btn-text`)
+replaces four separate ad hoc declarations (`.action-btn`, `.reset-btn`,
+`.page-btn`, `.feed-btn`) that had nearly-identical but not-quite-consistent
+padding/radius/hover behavior.
+
+Hero rebuilt as a real two-column landing section instead of a stats
+strip: left is the headline number (count-up animated) plus a one-line
+description; right is a single **featured opportunity** card (the current
+#1 non-aggregator agency by opportunity_score, in the one place purple
+appears, per "purple = featured market") with its population/quality/
+realtime and a CTA straight to its detail page — replacing the old
+"Largest uncovered market" mini-stat, which duplicated this same
+information less usefully. The four remaining supporting metrics moved
+into their own tile row below, each with its own icon and accent color so
+they read as distinct facts rather than six identical boxes.
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume
