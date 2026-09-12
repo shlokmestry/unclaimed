@@ -550,43 +550,25 @@ default. -->
   }
 
   /* --- Readiness badges --- */
+  /* Tinted background + a thin matching border, no filled dot — a dot
+     is reserved for genuinely live status elsewhere; a badge's own color
+     and label already say what it needs to. Small, quiet, not a bright
+     filled pill. */
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    padding: 2px 9px;
     border-radius: var(--radius-badge);
+    border: 1px solid transparent;
   }
 
-  .badge .badge-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-  }
-
-  .badge.ready { background: rgba(39,165,89,0.15); color: var(--good); }
-  .badge.ready .badge-dot { background: var(--good); }
-  .badge.needs-work { background: rgba(255,194,71,0.15); color: var(--warning); }
-  .badge.needs-work .badge-dot { background: var(--warning); }
-  .badge.dead-feed { background: rgba(255,107,87,0.15); color: var(--critical); }
-  .badge.dead-feed .badge-dot { background: var(--critical); }
-  .badge.unknown { background: rgba(255,255,255,0.08); color: var(--text-muted); }
-  .badge.unknown .badge-dot { background: var(--text-muted); }
-
-  .row-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    margin-right: 9px;
-    flex-shrink: 0;
-  }
-  .row-dot.ready { background: var(--good); }
-  .row-dot.needs-work { background: var(--warning); }
-  .row-dot.dead-feed { background: var(--critical); }
-  .row-dot.unknown { background: var(--text-muted); }
+  .badge.ready { background: var(--emerald-wash); border-color: var(--emerald-border); color: var(--emerald-strong); }
+  .badge.needs-work { background: var(--amber-wash); border-color: var(--amber-border); color: var(--amber); }
+  .badge.dead-feed { background: var(--red-wash); border-color: var(--red-border); color: var(--red); }
+  .badge.unknown { background: var(--surface-3); border-color: var(--border); color: var(--text-muted); }
 
   /* --- Controls --- */
   /* Flat, not floating — this is filter chrome, not a focal card. Shadow
@@ -787,6 +769,26 @@ default. -->
   .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
   .state-row.error { color: var(--critical); }
   .state-row .icon { margin-right: 6px; }
+
+  /* --- Skeleton loading: keeps the table's exact row height/column
+     rhythm so nothing jumps when real data arrives. --- */
+  .skel {
+    display: inline-block;
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+    background-size: 400% 100%;
+    animation: skel-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skel-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skel { animation: none; }
+  }
 
   .pagination {
     display: flex;
@@ -1126,12 +1128,20 @@ default. -->
               <th data-key="municipality">City<span class="arrow"></span></th>
               <th class="num" data-key="population">Population<span class="arrow"></span></th>
               <th class="num" data-key="quality_score">Feed Quality<span class="arrow"></span></th>
+              <th data-key="readiness_status">Readiness<span class="arrow"></span></th>
               <th class="num" data-key="opportunity_score">Opportunity Score<span class="arrow"></span></th>
               <th>Feed URL</th>
             </tr>
           </thead>
           <tbody id="table-body">
-            <tr><td colspan="7"><div class="state-row">Loading agencies…</div></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
+            <tr class="skeleton-row"><td><span class="skel" style="width:72%"></span></td><td><span class="skel" style="width:55%"></span></td><td><span class="skel" style="width:50%"></span></td><td class="num"><span class="skel" style="width:48%"></span></td><td class="num"><span class="skel" style="width:28%"></span></td><td><span class="skel" style="width:60px"></span></td><td class="num"><span class="skel" style="width:38%"></span></td><td><span class="skel" style="width:64px"></span></td></tr>
           </tbody>
         </table>
       </div>
@@ -1299,7 +1309,7 @@ default. -->
     function readinessBadge(status) {
       const slug = readinessSlug(status);
       const label = status || "Unknown";
-      return `<span class="badge ${slug}"><span class="badge-dot"></span>${escapeHtml(label)}</span>`;
+      return `<span class="badge ${slug}">${escapeHtml(label)}</span>`;
     }
 
     // Updates an existing badge element in place (className + content)
@@ -1309,7 +1319,7 @@ default. -->
       const slug = readinessSlug(status);
       const label = status || "Unknown";
       el.className = `badge ${slug}`;
-      el.innerHTML = `<span class="badge-dot"></span>${escapeHtml(label)}`;
+      el.textContent = label;
     }
 
     function formatDate(iso) {
@@ -1360,7 +1370,7 @@ default. -->
     function renderStateRow(message, isError) {
       pagination.hidden = true;
       resultMeta.textContent = "";
-      tableBody.innerHTML = `<tr><td colspan="7">
+      tableBody.innerHTML = `<tr><td colspan="8">
         <div class="state-row ${isError ? "error" : ""}">
           ${isError ? '<span class="icon">⚠</span>' : ""}${message}
         </div>
@@ -1457,11 +1467,12 @@ default. -->
       tableBody.innerHTML = pageRows
         .map((a) => `
         <tr data-id="${a.id}">
-          <td class="name-cell"><span class="row-dot ${readinessSlug(a.readiness_status)}"></span>${escapeHtml(a.name) || "—"}</td>
+          <td class="name-cell">${escapeHtml(a.name) || "—"}</td>
           <td>${escapeHtml(a.country) || "—"}</td>
           <td>${escapeHtml(a.municipality) || "—"}</td>
           <td class="num">${numberFormat(a.population)}</td>
           <td class="num">${a.quality_score ?? "—"}</td>
+          <td>${readinessBadge(a.readiness_status)}</td>
           <td class="num">${a.opportunity_score ?? "—"}</td>
           <td>${
             a.feed_url

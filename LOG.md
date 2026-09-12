@@ -180,6 +180,31 @@ only the project owner has), a charting library (kept to hand-rolled
 SVG), and React/Tailwind/Framer Motion as actual dependencies (the
 static single-file architecture still doesn't warrant a build step).
 
+Component pass (badges, table, skeleton loading):
+- **Badges** rebuilt from a filled pill with a colored dot inside, to a
+  tinted background + thin matching border + no dot, using the new
+  semantic wash/border token pairs (ready=emerald, needs-work=amber,
+  dead-feed=red, unknown=neutral surface).
+- **Row dots removed.** The table's per-row colored dot (and the
+  now-unused `.row-dot` CSS) is gone. Rather than just deleting the
+  signal it carried, added a proper **Readiness column** using the same
+  redesigned badge component — more informative than a bare dot, and
+  sortable via the existing column-sort mechanism, at the cost of one
+  more (narrow) column. `renderStateRow`'s `colspan` bumped 7→8 to match;
+  the separate pitch-view table (unaffected, still 7 cols) was left
+  alone.
+- **Skeleton loading state**: the table body's initial "Loading
+  agencies…" text row is now 8 shimmering placeholder rows matching the
+  real table's column layout, so first paint doesn't jump when data
+  arrives (`@keyframes skel-shimmer`, respects
+  `prefers-reduced-motion`).
+- Skipped, deliberately: a persistent "selected row" concept. The brief
+  asked for a "subtle accent border" on a selected row, but this app has
+  no selection state to begin with — rows navigate to a detail view on
+  click, they aren't selectable/multi-selectable — so styling a
+  selection state that doesn't exist would mean inventing a feature, not
+  polishing one. Flagged here rather than faked.
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume
