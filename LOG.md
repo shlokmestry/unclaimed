@@ -120,6 +120,23 @@ information less usefully. The four remaining supporting metrics moved
 into their own tile row below, each with its own icon and accent color so
 they read as distinct facts rather than six identical boxes.
 
+Stage 3 — filters and table/card interaction:
+- Readiness filter changed from a `<select>` to a chip/pill toggle group
+  (All / Ready / Needs Work / Dead Feed), matching the brief's "Linear or
+  GitHub issue filters" reference — a small state variable
+  (`readinessValue`) replaces reading `.value` off a select element, kept
+  in sync with the active chip's styling.
+- The filter toolbar (`.controls`) is now `position: sticky` with a
+  blurred translucent background, so it stays usable while scrolling a
+  paginated 50-row table instead of scrolling away.
+- Table rows: hover now shows a quiet left accent bar (`box-shadow: inset`
+  on the first cell) instead of a flat green wash — reads as "lift"
+  without fighting table layout the way a real `transform` on a `<tr>`
+  would — and the row's feed-link arrow nudges on hover.
+- Top Opportunities cards: hover now lifts (`translateY(-2px)`), brightens
+  the border to emerald, and brightens the CTA pill inside it, per the
+  brief's "surface lifts / border brightens / CTA animates" hover spec.
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume

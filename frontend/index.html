@@ -424,11 +424,19 @@ default. -->
     padding: 16px;
     box-shadow: var(--shadow);
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease),
+                box-shadow var(--dur-fast) var(--ease);
   }
 
   .pick-card:hover {
-    border-color: var(--accent-fill);
+    border-color: var(--emerald);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .pick-card:hover .btn-primary {
+    filter: brightness(1.08);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 6px 14px rgba(34,197,94,0.35);
   }
 
   .pick-card .pick-name {
@@ -501,17 +509,47 @@ default. -->
   /* --- Controls --- */
   /* Flat, not floating — this is filter chrome, not a focal card. Shadow
      is reserved for things worth looking at first (hero stats, pick
-     cards, the table itself); a filter bar shouldn't compete with them. */
+     cards, the table itself); a filter bar shouldn't compete with them.
+     Sticky + a blurred backdrop so it stays usable while scrolling a
+     long, paginated table without permanently eating vertical space. */
   .controls {
     display: flex;
     align-items: end;
     gap: 18px;
     flex-wrap: wrap;
-    background: var(--surface-1);
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: rgba(22,23,26,0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px 20px;
     margin-bottom: 16px;
+  }
+
+  .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--gridline);
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+
+  .chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+  .chip.active {
+    background: var(--emerald-wash);
+    border-color: var(--emerald);
+    color: var(--emerald-strong);
   }
 
   .control-group {
@@ -602,7 +640,10 @@ default. -->
 
   thead th .arrow { margin-left: 4px; color: var(--accent); display: inline-block; width: 10px; }
 
-  tbody tr { cursor: pointer; }
+  tbody tr {
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease);
+  }
   tbody tr:nth-child(even) { background: var(--row-alt); }
 
   tbody td {
@@ -610,10 +651,18 @@ default. -->
     border-bottom: 1px solid var(--gridline);
     color: var(--text-primary);
     white-space: nowrap;
+    box-shadow: inset 0 0 0 0 var(--emerald);
+    transition: box-shadow var(--dur-fast) var(--ease);
   }
 
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: var(--accent-wash); }
+
+  /* A quiet left accent bar on hover reads as "lift" without actually
+     transforming a table row (which fights table layout) — same
+     principle as a Linear list-item hover. */
+  tbody tr:hover { background: var(--surface-hover); }
+  tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 0 var(--emerald); }
+  tbody tr:hover .feed-link svg { transform: translate(1px, -1px); }
 
   td.name-cell { display: flex; align-items: center; }
 
@@ -640,7 +689,7 @@ default. -->
   }
 
   .feed-link:hover { text-decoration: underline; }
-  .feed-link svg { flex-shrink: 0; opacity: 0.85; }
+  .feed-link svg { flex-shrink: 0; opacity: 0.85; transition: transform var(--dur-fast) var(--ease); }
 
   .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
   .state-row.error { color: var(--critical); }
@@ -951,13 +1000,13 @@ default. -->
       </div>
 
       <div class="control-group">
-        <label for="readiness-filter">Readiness</label>
-        <select id="readiness-filter">
-          <option value="">All</option>
-          <option value="Ready">Ready</option>
-          <option value="Needs Work">Needs Work</option>
-          <option value="Dead Feed">Dead Feed</option>
-        </select>
+        <label id="readiness-label">Readiness</label>
+        <div class="chip-group" id="readiness-chips" role="group" aria-labelledby="readiness-label">
+          <button class="chip active" type="button" data-value="">All</button>
+          <button class="chip" type="button" data-value="Ready">Ready</button>
+          <button class="chip" type="button" data-value="Needs Work">Needs Work</button>
+          <button class="chip" type="button" data-value="Dead Feed">Dead Feed</button>
+        </div>
       </div>
 
       <div class="control-group">
@@ -1114,7 +1163,8 @@ default. -->
 
     const tableBody = document.getElementById("table-body");
     const countryFilter = document.getElementById("country-filter");
-    const readinessFilter = document.getElementById("readiness-filter");
+    const readinessChips = document.getElementById("readiness-chips");
+    let readinessValue = "";
     const qualitySlider = document.getElementById("quality-slider");
     const qualitySliderValue = document.getElementById("quality-slider-value");
     const searchInput = document.getElementById("search-input");
@@ -1228,7 +1278,7 @@ default. -->
 
       let rows = allAgencies.filter((a) => {
         if (countryFilter.value && a.country !== countryFilter.value) return false;
-        if (readinessFilter.value && a.readiness_status !== readinessFilter.value) return false;
+        if (readinessValue && a.readiness_status !== readinessValue) return false;
         const minQuality = Number(qualitySlider.value);
         if (minQuality > 0 && (a.quality_score ?? 0) < minQuality) return false;
         if (query) {
@@ -1648,7 +1698,22 @@ default. -->
     });
 
     countryFilter.addEventListener("change", () => { currentPage = 1; renderTable(); });
-    readinessFilter.addEventListener("change", () => { currentPage = 1; renderTable(); });
+
+    function setReadinessChip(value) {
+      readinessValue = value;
+      readinessChips.querySelectorAll(".chip").forEach((chip) => {
+        chip.classList.toggle("active", chip.dataset.value === value);
+      });
+    }
+
+    readinessChips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      setReadinessChip(chip.dataset.value);
+      currentPage = 1;
+      renderTable();
+    });
+
     qualitySlider.addEventListener("input", () => {
       qualitySliderValue.textContent = qualitySlider.value;
       currentPage = 1;
@@ -1663,7 +1728,7 @@ default. -->
 
     resetBtn.addEventListener("click", () => {
       countryFilter.value = "";
-      readinessFilter.value = "";
+      setReadinessChip("");
       qualitySlider.value = 0;
       qualitySliderValue.textContent = "0";
       searchInput.value = "";
