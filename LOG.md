@@ -34,6 +34,21 @@ PgBouncer, not something invented here):
   reused across unrelated requests (recommended alongside the above so
   prepared statements don't pile up on the Postgres/PgBouncer side)
 
+## Dashboard stats redesign
+
+The six stat tiles were all styled identically (same card, same size, same
+decorative top accent stripe on every single one) — no visual hierarchy, so
+the two numbers that actually matter for the pitch (Total uncovered, Ready
+to onboard) carried no more weight than "Average feed quality". Reworked
+into two tiers: `stats-hero` — two larger featured cards for Total
+uncovered and Ready to onboard (the latter gets a left accent border, not a
+gradient, to flag it as the headline number without adding decoration that
+doesn't mean anything) — and `stats-secondary`, one shared strip with
+internal dividers for the four supporting metrics (countries, realtime
+count, avg quality, largest market), instead of repeating the same boxed
+card pattern six times. Removed the per-tile colored top stripe entirely —
+it was decorative only, not tied to any actual status or meaning.
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume
