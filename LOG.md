@@ -137,6 +137,49 @@ Stage 3 — filters and table/card interaction:
   the border to emerald, and brightens the CTA pill inside it, per the
   brief's "surface lifts / border brightens / CTA animates" hover spec.
 
+## Second full polish pass (Linear/Vercel/Stripe/Raycast brief, round 2)
+
+A follow-up brief asked to specifically strip remaining "AI-generated
+Tailwind/shadcn" tells from the round-1 redesign. Concrete changes:
+
+- **Border radius**: replaced the pill-everywhere default (`999px` on
+  buttons, chips, inputs, badges) with a real, un-round scale — badges
+  10px, buttons 13px, inputs 12px, table 16px, cards 18px — via new
+  `--radius-badge/btn/input/table/sm/md/lg` tokens. Pills are now reserved
+  for genuinely circular things (status dots).
+- **Text hierarchy**: `--text-primary/secondary/muted/disabled` are now
+  one base color (`--ink`) at decreasing opacity instead of four
+  unrelated hex grays — reads as one coherent type system.
+- **Semantic colors**: added `--blue` (info) alongside the existing
+  emerald/cyan/amber/purple/red, each with its own `-wash`/`-border`
+  pair, so a status color is never reused for an unrelated meaning.
+- **Links**: the global `a` rule no longer paints every link emerald by
+  default — plain inline links (pitch table's "Feed" link, the pitch
+  footer's back-link) are secondary-colored until hovered. Anything
+  meant as a persistent CTA (`.pitch-link`, `.feed-link`, `.btn-text`)
+  keeps its own explicit color instead of inheriting the generic rule.
+- **Primary button**: dropped the colored glow shadow ("no glowing
+  blob" per the brief) in favor of a matte gradient + a 1px inset
+  highlight + a 1px hover lift; focus ring changed from a hard 2px
+  outline to a softer plane-colored-gap halo (still meets contrast).
+- **Table row feed link**: now muted/quiet by default with its arrow
+  icon hidden, and only turns emerald with the arrow fading in on row
+  hover — cut another ~50 lines of standing green text down to a hover
+  reveal, continuing the "wall of green" fix from round 1.
+- **Hero**: added a tiny uppercase eyebrow label above the headline
+  number, and a soft, contained radial emerald glow behind it (not a
+  full-bleed background gradient) so the number reads as lit rather than
+  flat-printed.
+- **Noise texture**: a near-invisible (2.5% opacity, `overlay` blend)
+  SVG fractal-noise layer over the whole page — the kind of thing a
+  screenshot doesn't consciously register but that keeps a large flat
+  dark background from reading as a flat CSS fill.
+
+Still not implemented, same reasons as round 1: Mapbox (needs a token
+only the project owner has), a charting library (kept to hand-rolled
+SVG), and React/Tailwind/Framer Motion as actual dependencies (the
+static single-file architecture still doesn't warrant a build step).
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume

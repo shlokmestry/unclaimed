@@ -40,37 +40,57 @@ default. -->
     --surface-3:      #26282c;
     --surface-hover:  #2a2d31;
 
-    --text-primary:   #f5f6f7;
-    --text-secondary: #b4b7bd;
-    --text-muted:     #7a7d84;
-    --gridline:       #2e3034;
-    --border:         rgba(255,255,255,0.08);
-    --border-strong:  rgba(255,255,255,0.16);
+    /* Text hierarchy via opacity on one base color, not three unrelated
+       grays — this is what actually makes a page's type feel like one
+       coherent system rather than picked-per-element. */
+    --ink: 245, 246, 247;
+    --text-primary:   rgb(var(--ink));
+    --text-secondary: rgba(var(--ink), 0.68);
+    --text-muted:     rgba(var(--ink), 0.46);
+    --text-disabled:  rgba(var(--ink), 0.28);
 
-    /* Primary: emerald. Secondary accents each carry one meaning and are
-       never used decoratively — cyan only for realtime, amber only for
-       "needs work", purple only for featured markets, red only for dead
-       feeds. */
-    --emerald:        #22c55e;
-    --emerald-strong: #4ade80;
-    --emerald-wash:   rgba(34,197,94,0.12);
-    --cyan:           #22d3ee;
-    --cyan-wash:      rgba(34,211,238,0.12);
-    --amber:          #f5a524;
-    --amber-wash:     rgba(245,165,36,0.12);
+    --gridline:       rgba(var(--ink), 0.09);
+    --border:         rgba(var(--ink), 0.08);
+    --border-strong:  rgba(var(--ink), 0.18);
+
+    /* Semantic colors — each gets foreground / subtle background / border,
+       and each is used for exactly one meaning, never decoratively:
+       emerald = primary action + "ready", cyan = realtime only,
+       amber = needs-work only, purple = featured only, red = dead-feed
+       only, blue = neutral info only. No color reused across meanings. */
+    --emerald:        #34d399;
+    --emerald-strong: #6ee7b7;
+    --emerald-wash:   rgba(52,211,153,0.11);
+    --emerald-border: rgba(52,211,153,0.32);
+
+    --cyan:           #38bdf8;
+    --cyan-wash:      rgba(56,189,248,0.11);
+    --cyan-border:    rgba(56,189,248,0.3);
+
+    --amber:          #eab308;
+    --amber-wash:     rgba(234,179,8,0.11);
+    --amber-border:   rgba(234,179,8,0.3);
+
     --purple:         #a78bfa;
-    --purple-wash:    rgba(167,139,250,0.12);
+    --purple-wash:    rgba(167,139,250,0.11);
+    --purple-border:  rgba(167,139,250,0.32);
+
     --red:            #f87171;
-    --red-wash:       rgba(248,113,113,0.12);
+    --red-wash:       rgba(248,113,113,0.11);
+    --red-border:     rgba(248,113,113,0.3);
+
+    --blue:           #60a5fa;
+    --blue-wash:      rgba(96,165,250,0.11);
+    --blue-border:    rgba(96,165,250,0.3);
 
     /* Back-compat aliases — the rest of the stylesheet (table, badges,
        detail view) was written against these names; keep them pointed at
        the new palette instead of touching every call site. */
     --accent:         var(--emerald-strong);
-    --accent-strong:  #bbf7d0;
+    --accent-strong:  #d1fae5;
     --accent-fill:    var(--emerald);
     --accent-wash:    var(--emerald-wash);
-    --row-alt:        rgba(255,255,255,0.02);
+    --row-alt:        rgba(var(--ink), 0.015);
     --good:           var(--emerald);
     --warning:        var(--amber);
     --critical:       var(--red);
@@ -86,7 +106,17 @@ default. -->
     --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
     --sp-5: 24px; --sp-6: 32px;  --sp-7: 48px;  --sp-8: 64px;
 
-    --radius-sm: 8px;  --radius-md: 12px;  --radius-lg: 16px;
+    /* A deliberately un-round scale — pill shapes (999px) are now reserved
+       for things that are actually circular (dots, avatars), not the
+       default for every card/button/input, which is the single biggest
+       "generated Tailwind dashboard" tell. */
+    --radius-badge: 10px;
+    --radius-btn:   13px;
+    --radius-input: 12px;
+    --radius-table: 16px;
+    --radius-sm:    10px;
+    --radius-md:    14px;
+    --radius-lg:    18px;
 
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
     --dur-fast: 120ms;
@@ -100,7 +130,24 @@ default. -->
     color: var(--text-primary);
     font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-feature-settings: "ss01" on;
+    position: relative;
   }
+
+  /* Extremely low-opacity fractal noise over the plane — the kind of
+     texture a screenshot doesn't consciously register but that keeps a
+     large flat dark background from looking like a flat CSS fill. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  .wrap, .pitch-wrap { position: relative; z-index: 1; }
 
   /* ---------- Motion: fade + slide on first paint, no framework ---------- */
   .reveal {
@@ -121,7 +168,7 @@ default. -->
     font-size: 13px;
     font-weight: 600;
     padding: 9px 16px;
-    border-radius: 999px;
+    border-radius: var(--radius-btn);
     border: 1px solid transparent;
     cursor: pointer;
     display: inline-flex;
@@ -133,17 +180,22 @@ default. -->
     white-space: nowrap;
   }
   .btn:active { transform: scale(0.97); }
+  /* A halo ring (plane-colored gap, then color) reads as softer than a
+     hard 2px outline while keeping enough contrast to stay visible. */
   .btn:focus-visible {
-    outline: 2px solid var(--emerald-strong);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--plane), 0 0 0 4px var(--emerald);
   }
 
+  /* Matte, not glossy — a faint top highlight reads as "solid button,"
+     not a glowing blob. No colored drop shadow. */
   .btn-primary {
-    background: linear-gradient(180deg, var(--emerald-strong), var(--emerald));
+    background: linear-gradient(180deg, var(--emerald-strong), var(--emerald) 65%);
     color: #06240f;
-    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 4px 12px rgba(34,197,94,0.28);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset;
   }
-  .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 6px 16px rgba(34,197,94,0.36); }
+  .btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
 
   .btn-ghost {
     background: var(--surface-2);
@@ -170,7 +222,13 @@ default. -->
     padding: 40px 24px 60px;
   }
 
-  a { color: var(--accent); }
+  /* Plain inline links read as secondary text until hovered — accenting
+     every link green regardless of context is one of the flatter
+     "everything is emerald" tells the brief calls out. Anything meant as
+     a persistent call-to-action gets its own explicit color instead
+     (.btn-text, .pitch-link, .feed-link). */
+  a { color: var(--text-secondary); text-decoration-color: transparent; transition: color var(--dur-fast) var(--ease), text-decoration-color var(--dur-fast) var(--ease); }
+  a:hover { color: var(--emerald-strong); text-decoration-color: currentColor; }
 
   [hidden] { display: none !important; }
 
@@ -222,19 +280,42 @@ default. -->
     .hero { grid-template-columns: 1fr; }
   }
 
-  .hero-left { display: flex; flex-direction: column; justify-content: center; }
+  .hero-left { display: flex; flex-direction: column; justify-content: center; position: relative; }
 
+  .hero-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* A soft, contained radial glow behind the number — not a full-bleed
+     background gradient, just enough falloff to make the number feel
+     lit rather than flat-printed. */
   .hero-number {
+    position: relative;
     font-size: clamp(56px, 8vw, 80px);
     font-weight: 800;
     letter-spacing: -0.03em;
-    line-height: 1;
-    margin: var(--sp-3) 0 var(--sp-4);
+    line-height: 1.05;
+    margin: var(--sp-2) 0 var(--sp-4);
     font-variant-numeric: tabular-nums;
     background: linear-gradient(180deg, var(--text-primary), var(--text-secondary));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  .hero-number::before {
+    content: "";
+    position: absolute;
+    left: -40px; top: -60%;
+    width: 320px; height: 320px;
+    background: radial-gradient(circle, var(--emerald-wash) 0%, transparent 65%);
+    z-index: -1;
+    pointer-events: none;
   }
 
   .hero-desc {
@@ -348,7 +429,7 @@ default. -->
 
   .metric-tile .mt-icon {
     width: 28px; height: 28px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
@@ -407,8 +488,10 @@ default. -->
   .section-heading a.pitch-link {
     font-size: 13px;
     font-weight: 600;
+    color: var(--emerald-strong);
     text-decoration: none;
   }
+  .section-heading a.pitch-link:hover { color: var(--emerald-strong); text-decoration: underline; }
 
   .top-picks {
     display: grid;
@@ -420,7 +503,7 @@ default. -->
   .pick-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     padding: 16px;
     box-shadow: var(--shadow);
     cursor: pointer;
@@ -435,8 +518,7 @@ default. -->
   }
 
   .pick-card:hover .btn-primary {
-    filter: brightness(1.08);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 6px 14px rgba(34,197,94,0.35);
+    filter: brightness(1.06);
   }
 
   .pick-card .pick-name {
@@ -475,7 +557,7 @@ default. -->
     font-size: 12px;
     font-weight: 700;
     padding: 3px 10px;
-    border-radius: 999px;
+    border-radius: var(--radius-badge);
   }
 
   .badge .badge-dot {
@@ -524,7 +606,7 @@ default. -->
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 16px 20px;
     margin-bottom: 16px;
   }
@@ -536,7 +618,7 @@ default. -->
     font-size: 13px;
     font-weight: 600;
     padding: 6px 14px;
-    border-radius: 999px;
+    border-radius: var(--radius-btn);
     border: 1px solid var(--gridline);
     background: var(--surface-2);
     color: var(--text-secondary);
@@ -570,7 +652,7 @@ default. -->
     font: inherit;
     font-size: 14px;
     padding: 7px 12px;
-    border-radius: 999px;
+    border-radius: var(--radius-input);
     border: 1px solid var(--gridline);
     background: var(--surface-2);
     color: var(--text-primary);
@@ -610,7 +692,7 @@ default. -->
   .table-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-table);
     overflow: hidden;
     box-shadow: var(--shadow);
   }
@@ -662,7 +744,7 @@ default. -->
      principle as a Linear list-item hover. */
   tbody tr:hover { background: var(--surface-hover); }
   tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 0 var(--emerald); }
-  tbody tr:hover .feed-link svg { transform: translate(1px, -1px); }
+  tbody tr:hover .feed-link svg { opacity: 0.85; transform: translate(0, 0); }
 
   td.name-cell { display: flex; align-items: center; }
 
@@ -674,6 +756,9 @@ default. -->
      (5 of them, in .pick-card) — repeated down every row of a 50-row table
      it turns into a wall of green and drowns out the data. Table rows get
      a quiet text link instead; the row itself is already a click target. */
+  /* Quiet by default — the row itself is the click target, so this reads
+     as metadata until the row is actually being looked at, rather than
+     fifty rows of standing emerald text. */
   .feed-link {
     display: inline-flex;
     align-items: center;
@@ -681,15 +766,23 @@ default. -->
     font: inherit;
     font-size: 13px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--text-muted);
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
+    transition: color var(--dur-fast) var(--ease);
   }
 
   .feed-link:hover { text-decoration: underline; }
-  .feed-link svg { flex-shrink: 0; opacity: 0.85; transition: transform var(--dur-fast) var(--ease); }
+  .feed-link svg {
+    flex-shrink: 0;
+    opacity: 0;
+    transform: translate(-2px, 2px);
+    transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+
+  tbody tr:hover .feed-link { color: var(--emerald-strong); }
 
   .state-row { padding: 48px 16px; text-align: center; color: var(--text-secondary); font-size: 14px; }
   .state-row.error { color: var(--critical); }
@@ -766,7 +859,7 @@ default. -->
   .detail-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: 20px 22px;
     box-shadow: var(--shadow);
   }
@@ -840,7 +933,7 @@ default. -->
   .pitch-number {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     padding: 22px 20px;
     text-align: center;
   }
@@ -858,7 +951,7 @@ default. -->
   .pitch-table-wrap {
     background: var(--surface-1);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-table);
     overflow: hidden;
     margin-bottom: 24px;
   }
@@ -918,6 +1011,7 @@ default. -->
 
     <section class="hero reveal" id="hero">
       <div class="hero-left">
+        <p class="hero-eyebrow">Unclaimed opportunity</p>
         <p class="hero-number" id="stat-total">—</p>
         <p class="hero-desc">
           Transit agencies with a public <strong>GTFS feed</strong> that
