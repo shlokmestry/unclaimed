@@ -2,6 +2,38 @@
 
 Decisions made during the build that weren't explicitly specified in the brief.
 
+## Post-deploy fix — intermittent "Failed to fetch" / 500s on /agencies and /stats
+
+Reported as the live dashboard sometimes failing to load. Vercel runtime
+error logs (`get_runtime_errors` on the `unclaimed-api` project) showed
+recurring `asyncpg` errors: `InvalidSQLStatementNameError: prepared
+statement "__asyncpg_stmt_5__" does not exist`, `DuplicatePreparedStatementError`,
+and — the actually user-visible one — a `ProtocolError` where a cached
+statement for `SELECT count(*) ...` (1 column) got served for the
+`/agencies` query (18 columns), producing a hard 500.
+
+Commit `f3acb49` had already added `statement_cache_size=0` to the asyncpg
+connect args to handle Supabase's Transaction Pooler (PgBouncer,
+transaction-pooling mode), but that only disables *asyncpg's own* client-side
+statement cache. SQLAlchemy's asyncpg dialect keeps a **second, separate**
+prepared-statement cache on top of that (`prepared_statement_cache_size`,
+documented under "Prepared Statement Cache" in
+`sqlalchemy.dialects.postgresql.asyncpg`) — that second cache was the one
+actually serving a stale, wrongly-shaped statement. On top of that, asyncpg
+names prepared statements with a plain incrementing counter, which can
+collide across transactions that PgBouncer routes to different backend
+processes (PgBouncer transaction mode doesn't `DISCARD` between
+transactions), matching the "already exists" / "does not exist" errors.
+`db/async_session.py` now sets all three documented mitigations together
+(this exact combination is SQLAlchemy's own documented fix for asyncpg +
+PgBouncer, not something invented here):
+- `prepared_statement_cache_size=0` (the missing piece)
+- `prepared_statement_name_func` generating a uuid4-based name per
+  statement, so names can never collide across backends
+- `poolclass=NullPool`, so a pooled DBAPI connection isn't held open and
+  reused across unrelated requests (recommended alongside the above so
+  prepared statements don't pile up on the Postgres/PgBouncer side)
+
 ## Step 1 — Docker + Postgres
 
 - Used `postgres:15` (matches the required "Postgres 15") with a named volume
